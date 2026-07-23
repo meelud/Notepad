@@ -1,0 +1,12 @@
+export const editor  = document.getElementById('editor');
+export const render  = document.getElementById('render');
+export const ph      = document.getElementById('ph');
+export const bPlay   = document.getElementById('bPlay');
+export const bStop   = document.getElementById('bStop');
+export const bSave   = document.getElementById('bSave');
+export const bClear  = document.getElementById('bClear');
+export const wcEl    = document.getElementById('wc');
+export const viz     = document.getElementById('viz');
+export const bars    = viz.querySelectorAll('.bar');
+export const prog    = document.getElementById('prog');
+export const pf      = document.getElementById('pf');
