@@ -2,6 +2,11 @@ import { ac } from './context.js';
 import { getReverbNode } from './reverb.js';
 import { rnd, pick } from '../utils/rng.js';
 
+/**
+ * 22 synthesizer voice types — each is a function(freq, vol, dur, dests)
+ * that plays a single note through the Web Audio graph.
+ * Voice selection happens in player.js via VOICE_GROUPS.
+ */
 export const VOICES = [
   // 0 — Soft pad
   (freq, vol, dur, dests) => {

@@ -5,23 +5,13 @@ export function playPunctuation(ch, dests, intensity) {
   const c = ac();
   const rev = getReverbNode();
 
-  if (ch === '.') {
-    const osc = c.createOscillator(), g = c.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(130.81, c.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(98, c.currentTime + 0.5);
-    g.gain.setValueAtTime(0.22 * intensity, c.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.7);
-    osc.connect(g); g.connect(rev); dests.forEach(d => g.connect(d));
-    osc.start(); osc.stop(c.currentTime + 0.8);
-
-  } else if (ch === ',') {
-    const osc = c.createOscillator(), g = c.createGain();
-    osc.type = 'sine'; osc.frequency.setValueAtTime(196, c.currentTime);
-    g.gain.setValueAtTime(0.12 * intensity, c.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.22);
-    osc.connect(g); g.connect(rev); dests.forEach(d => g.connect(d));
-    osc.start(); osc.stop(c.currentTime + 0.3);
+  // Meaningful silence: '.' and ',' no longer strike a lead note. The pause
+  // itself (already handled by the timing gap in player.js) IS the punctuation —
+  // the ambient pad/drone keeps breathing underneath, but nothing new is voiced
+  // on top of it. This gives the piece real moments of rest instead of a
+  // dedicated tone on every single mark.
+  if (ch === '.' || ch === ',') {
+    return;
 
   } else if (ch === '!') {
     [523.25, 659.25, 784].forEach((f, i) => {

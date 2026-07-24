@@ -1,3 +1,4 @@
+/* ─── Reset & variables ────────────────────────────────────── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -14,6 +15,7 @@
   --brass-dim: #5e4f30;
 }
 
+/* ─── Body layout ──────────────────────────────────────────── */
 html, body { height: 100%; background: var(--bg); color: var(--text); }
 body { display: flex; flex-direction: column; align-items: center; font-family: 'Inter', sans-serif; }
 
@@ -73,6 +75,9 @@ body { display: flex; flex-direction: column; align-items: center; font-family: 
   .rivet.tr { top: 4px; right: 4px; }
   .rivet.bl { bottom: 4px; left: 4px; }
   .rivet.br { bottom: 4px; right: 4px; }
+  #feedback { bottom: 16px; right: 16px; gap: 5px; }
+  #feedback span { font-size: 10px; }
+  #feedback-pin { font-size: 12px; }
 }
 
 .btn {
@@ -182,4 +187,45 @@ body:hover #mark, #mark:hover {
   opacity: 0.85;
   filter: grayscale(0);
   transform: translateY(-2px);
+}
+
+/* ─── Feedback label ──────────────────────────────────────── */
+#feedback {
+  position: fixed;
+  bottom: 22px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+body:hover #feedback { opacity: 1; }
+
+#feedback span {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  line-height: 2;
+  color: #2e2b27;
+  text-align: right;
+  pointer-events: none;
+}
+
+#feedback-pin {
+  font-size: 14px;
+  text-decoration: none;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+#feedback-pin:hover {
+  opacity: 1;
+  transform: rotate(-15deg);
 }

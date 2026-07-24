@@ -3,14 +3,16 @@ import { getReverbNode } from './reverb.js';
 import { rnd, pick } from '../utils/rng.js';
 import { currentScale } from '../music/harmony.js';
 
+// ─── State ──────────────────────────────────────────────────────
 let ambTimers = [];
 let clockRunning = false;
 let ambientDensity = 1;
 
-const BEAT_SEC = 1.15;
-const BAR_BEATS = 4;
-const CHORD_DEGREES = [0, 2, 4, 6];
+const BEAT_SEC = 1.15;    // seconds per beat (~52 BPM)
+const BAR_BEATS = 4;       // beats per bar (4/4 time)
+const CHORD_DEGREES = [0, 2, 4, 6]; // scale degrees for chord voicing
 
+// ─── Public API ─────────────────────────────────────────────────
 export function setAmbientDensity(v) { ambientDensity = v; }
 
 export function clearAmb() {
@@ -19,6 +21,7 @@ export function clearAmb() {
   clockRunning = false;
 }
 
+// ─── Helpers ────────────────────────────────────────────────────
 function chordFromScaleLocal(scale, degreeRoot) {
   const len = scale.length;
   const root    = scale[degreeRoot % len] * (degreeRoot >= len ? 2 : 1);
@@ -28,6 +31,13 @@ function chordFromScaleLocal(scale, degreeRoot) {
   return [root, third, fifth, seventh];
 }
 
+// ─── Ambient clock ──────────────────────────────────────────────
+/**
+ * Starts a looping clock that plays chords, pulses, and motif notes.
+ * Density scales the volume of all ambient layers.
+ * @param {AudioNode[]} dests — audio destinations
+ * @param {() => boolean} isStopping — callback to check if playback stopped
+ */
 export function startAmbient(dests, isStopping) {
   const c = ac();
   const rev = getReverbNode();

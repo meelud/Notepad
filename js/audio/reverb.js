@@ -1,9 +1,11 @@
 import { ac } from './context.js';
 import { rnd } from '../utils/rng.js';
 
+// ─── State ──────────────────────────────────────────────────────
 let reverbNode = null;
 let reverbSend = null;
 
+// ─── Public API ─────────────────────────────────────────────────
 export function getReverbNode() { return reverbNode; }
 
 export function resetReverb() {
@@ -11,8 +13,16 @@ export function resetReverb() {
   reverbSend = null;
 }
 
+// ─── Convolver builder ──────────────────────────────────────────
+/**
+ * Builds a stereo convolution reverb from a synthetic impulse response.
+ * The IR is random noise shaped by an exponential decay curve.
+ * @param {AudioContext} c
+ * @returns {ConvolverNode}
+ */
 function buildReverb(c) {
-  const dur = 4.5, decay = 2.2;
+  const dur = 4.5,    // reverb tail length in seconds
+        decay = 2.2;  // exponential decay exponent (higher = faster falloff)
   const len = Math.floor(c.sampleRate * dur);
   const buf = c.createBuffer(2, len, c.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
@@ -25,12 +35,18 @@ function buildReverb(c) {
   return conv;
 }
 
+// ─── Init ───────────────────────────────────────────────────────
+/**
+ * Creates the reverb node once and connects it to all destinations.
+ * Safe to call multiple times — only builds on first call.
+ * @param {AudioNode[]} dests
+ */
 export function ensureReverb(dests) {
   const c = ac();
   if (!reverbNode) {
     reverbNode = buildReverb(c);
     reverbSend = c.createGain();
-    reverbSend.gain.value = 0.38;
+    reverbSend.gain.value = 0.38; // dry/wet mix (0 = dry, 1 = full wet)
     reverbNode.connect(reverbSend);
     dests.forEach(d => reverbSend.connect(d));
   }

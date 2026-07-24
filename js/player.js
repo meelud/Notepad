@@ -8,6 +8,7 @@ import { deriveTextHarmony, hashText, wordNoteScale, currentScale } from './musi
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 
+// ─── State ──────────────────────────────────────────────────────
 let playing = false;
 let stopping = false;
 let rec = null;
@@ -18,17 +19,25 @@ let harmonyLocked = false;
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
 
+// ─── Voice selection by sentence type ───────────────────────────
 const VOICE_GROUPS = {
   statement: [0, 2, 5, 6, 10, 12, 13, 15, 16, 20, 21],
   question:  [1, 4, 7, 9, 11, 17, 19, 20],
   exclaim:   [1, 3, 5, 8, 9, 11, 14, 17, 18],
 };
 
+// ─── Visualizer ─────────────────────────────────────────────────
 function animBars(vol) {
   bars.forEach(b => { b.style.height = Math.round(rnd(1.5, vol * 17)) + 'px'; });
   setTimeout(() => bars.forEach(b => b.style.height = '1.5px'), 120);
 }
 
+// ─── Playback ───────────────────────────────────────────────────
+/**
+ * Main playback loop — tokenizes text, derives harmony,
+ * and plays each word/punctuation as audio.
+ * Records output to a Blob (audio/webm) for later save.
+ */
 export async function play() {
   const text = editor.value;
   if (!text.trim()) return;
@@ -84,7 +93,11 @@ export async function play() {
     if (tok.type === 'punct') {
       const intensity = 0.7 + 0.3;
       playPunctuation(tok.text, dests, intensity);
-      animBars(0.2 * intensity);
+      // '.' and ',' are meaningful silence now (no lead note) — keep the bars
+      // still too, so the visual doesn't fake activity that isn't there.
+      const isSilent = tok.text === '.' || tok.text === ',';
+      if (!isSilent) animBars(0.2 * intensity);
+      // pause durations (ms): period=420, question=380, exclaim=340, comma=200, other=150
       const pause = tok.text === '.' ? 420 : tok.text === '?' ? 380 : tok.text === '!' ? 340 : tok.text === ',' ? 200 : 150;
       await sleep(pause);
       continue;
@@ -94,6 +107,7 @@ export async function play() {
     const wlen = tok.text.replace(/\W/g, '').length || 1;
     const group = VOICE_GROUPS[tok.sentenceType] || VOICE_GROUPS.statement;
 
+    // ambient density: thinner at paragraph start, thicker at end
     const density = tok.paraPos === 'start' ? 0.55 : tok.paraPos === 'end' ? 1.35 : 1;
     setAmbientDensity(density);
 
@@ -105,6 +119,7 @@ export async function play() {
     VOICES[voiceIdx](freq, vol, dur, dests);
     animBars(vol);
 
+    // word-length → timing: base 300ms + 28ms per letter, capped at 600ms
     const base = 300 + wlen * 28;
     const spd  = Math.min(600, base) + rnd(-30, 50);
     pf.style.width = Math.round((wordsSeen / totalWords) * 100) + '%';
@@ -120,6 +135,7 @@ export async function play() {
   bars.forEach(b => b.style.height = '1.5px');
   playing = false;
   bPlay.disabled = false; bStop.disabled = true;
+  // fade out progress bar after 900ms
   setTimeout(() => prog.classList.remove('on'), 900);
 
   // show continue prompt
@@ -129,6 +145,7 @@ export async function play() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
 }
 
+// ─── Stop ───────────────────────────────────────────────────────
 export function stop() {
   stopping = true;
   clearAmb();
@@ -142,6 +159,7 @@ export function stop() {
   bPlay.disabled = false; bStop.disabled = true;
 }
 
+// ─── Reset helpers ──────────────────────────────────────────────
 export function resetHarmony() {
   harmonyLocked = false;
 }
