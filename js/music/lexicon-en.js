@@ -5,6 +5,12 @@
  */
 export const EMOTION_LEXICON = {
   joy: { weight: 1.1, tense: 0, words: [
+
+    'giddy up','buzzing right now','over the top happy','on top of the world today',
+    'good times','feeling blessed','vibing hard','riding high','all smiles today',
+    'in a great mood','absolutely thrilled','pure joy','can’t stop smiling',
+    'grinning ear to ear','life is good','loving this moment','best day ever',
+    'this made my day','feeling fantastic','on a high','buzzed with excitement',
     'happy','joy','joyful','delight','delighted','glad','cheerful','elated','bliss','blissful',
     'wonderful','great','fantastic','amazing','laugh','laughing','smile','smiling','fun','playful',
     'excited','sunny','bright','radiant','vibrant','lively',
@@ -28,6 +34,12 @@ export const EMOTION_LEXICON = {
     'pumped about it','excited about it','looking forward to it','counting down the days',
   ]},
   love: { weight: 1.0, tense: 0, words: [
+
+    'stupid in love','crazy about you','can’t get enough of you','you’re my person',
+    'my whole heart','soft for you','simping hard','my favorite human',
+    'you make me weak','you complete me','forever and always','ride or die love',
+    'my ride or die','can’t live without you','you’re it for me','endgame',
+    'my constant','home to me','you feel like home','safe with you',
     'love','loving','adore','affection','sweetheart','darling','cherish','beloved','romance',
     'kiss','embrace','tender','devotion','soulmate','warmth','caring',
     'crush','smitten','infatuated','babe','honey','boo','cuddle','snuggle','flirt','flirting',
@@ -50,6 +62,11 @@ export const EMOTION_LEXICON = {
     'you complete me','you make me whole','you make me better','you make me happy',
   ]},
   calm: { weight: 0.7, tense: -0.3, words: [
+
+    'taking it slow','no rush','breathing easy','settling in','finding my center',
+    'letting go of it','not stressing','it is what it is','going with the flow',
+    'staying grounded','keeping it together','holding steady','feeling zen af',
+    'nothing to worry about','all is well','in a good headspace','clear headed',
     'calm','peace','peaceful','serene','quiet','still','gentle','soft','tranquil','rest','resting',
     'breathe','ease','relax','relaxed','soothing','silence','stillness',
     'chill','chilling','mellow','laid-back','easygoing','unwind','unwinding','relaxing',
@@ -69,6 +86,11 @@ export const EMOTION_LEXICON = {
     'zen','nirvana','euphoria','serenity','tranquility',
   ]},
   hope: { weight: 0.8, tense: -0.1, words: [
+
+    'better days coming','light at the end','it’s gonna work out','trust the timing',
+    'good things coming','patience pays off','on the come up','glow up incoming',
+    'watch this space','believe it will happen','faith over fear','staying positive',
+    'keeping my chin up','onward and upward','brighter days ahead',
     'hope','hopeful','dream','dreaming','future','faith','believe','wish','light','promise',
     'grateful','gratitude','free','freedom','alive','beginning','new','grow','growth',
     'optimistic','upbeat','motivated','ambitious','driven','determined','striving','aspire',
@@ -91,6 +113,11 @@ export const EMOTION_LEXICON = {
     'slowly but surely','eventually','in time','sooner or later','one day',
   ]},
   sadness: { weight: -1.0, tense: 0.1, words: [
+
+    'in my feelings','not my best day','running on empty','emotionally drained',
+    'heavy heart today','just not okay right now','struggling a bit','off today',
+    'in a funk','feeling some type of way','down bad','not vibing today',
+    'need a moment','processing a lot','carrying a lot right now',
     'sad','sadness','sorrow','grief','grieving','cry','crying','tears','weep','heartbroken',
     'lonely','alone','loneliness','empty','emptiness','hollow','loss','missing',
     'hurt','hurting','broken','depressed','blue','gloom','gloomy','melancholy','heavy',
@@ -112,6 +139,10 @@ export const EMOTION_LEXICON = {
     'spirits are low','morale is low','energy is low','enthusiasm is low',
   ]},
   fear: { weight: -0.9, tense: 0.5, words: [
+
+    'freaking out a little','nerves are shot','on edge today','can’t shake this feeling',
+    'spiraling a bit','overthinking everything','worried sick','bracing for impact',
+    'holding my breath','knot in my stomach','dreading this','scared out of my mind',
     'fear','afraid','scared','terrified','terror','dread','anxious','anxiety','worry','worried',
     'nervous','panic','threat','danger','unsafe','trembling','frightened','horror','nightmare',
     'ترس','ترسیده','وحشت','نگران','نگرانی','اضطراب','استرس','خطر','کابوس','لرزان','هراس',
@@ -130,6 +161,11 @@ export const EMOTION_LEXICON = {
     'senses on high alert','hyperaware','hyper vigilant','on guard','on watch',
   ]},
   anger: { weight: -0.7, tense: 1.0, words: [
+
+    'not today','done with this nonsense','over this already','beyond frustrated',
+    'at my limit','last nerve gone','absolutely done','over it completely',
+    'so over this','fuming right now','raging inside','ready to snap',
+    'about to lose it','can’t even right now','so mad rn','so annoyed rn',
     'anger','angry','furious','fury','rage','mad','hate','hatred','resent','resentment',
     'bitter','bitterness','outrage','irritated','frustrated','frustration','scream','screaming',
     'fuck','fucking','fucked','shit','shitty','damn','dammit','hell','ass','asshole','bitch',
@@ -148,6 +184,13 @@ export const EMOTION_LEXICON = {
     'take a hike','beat it','scram','vamoose','skedaddle','make like a tree',
   ]},
   dark: { weight: -0.8, tense: 0.4, words: [
+
+    'existential dread','void inside','running on fumes','barely holding it together',
+    'nothing feels real','going through it','dark place right now','can’t see a way out',
+    'hollow feeling','numb to everything','lost the plot','falling apart quietly',
+    'empty on the inside','world feels heavy','crushing weight','drowning slowly',
+    'give up feeling','no point anymore','fading away','disappearing inside',
+    'ghost of myself','shell of who I was','broken beyond repair','can’t feel anything',
     'dark','darkness','cold','coldness','death','dying','dead','despair','desperate','hopeless',
     'void','abyss','shadow','shadows','bleak','doom','suffering','pain','painful','wound','wounded',
     'تاریک','تاریکی','سرد','سرما','مرگ','مردن','ناامید','نومیدی','رنج','درد','زخم','سایه','تباهی',
@@ -166,6 +209,12 @@ export const EMOTION_LEXICON = {
     'black hole','nothingness','oblivion','eternal darkness',
   ]},
   nostalgia: { weight: -0.2, tense: -0.1, words: [
+
+    'those were the days','simpler times fr','miss the old days','throwback feels',
+    'takes me back','old school vibes','remember this','flashback moment',
+    'nostalgia hit hard','feels like forever ago','good old memories','2000s kid energy',
+    'childhood flashback','miss those summers','miss high school','old playlist hits different',
+    'time capsule feeling','walk down memory lane fr','those good old days','miss being young',
     'remember','memory','memories','past','once','childhood','old','faded','distant',
     'longing','yearning','bittersweet','farewell','goodbye','gone','fading','nostalgia','nostalgic',
     'یاد','خاطره','خاطرات','گذشته','کودکی','دلتنگی','خداحافظ','رفته','محو','دور',
@@ -185,6 +234,11 @@ export const EMOTION_LEXICON = {
     'ancient times','bygone era','bygone days','lost era',
   ]},
   vice: { weight: -0.3, tense: 0.2, words: [
+
+    'one more round','just one more drink','skip the gym again','bad habit again',
+    'cheat day energy','no self control today','indulging a bit too much','impulse buy again',
+    'doom scrolling again','staying up too late again','procrastinating hard','avoiding responsibilities',
+    'unhealthy coping','bad decisions tonight','yolo energy','regret this tomorrow probably',
     'smoke','smoking','cigarette','cigarettes','cigs','vape','vaping','drunk','wasted','booze',
     'beer','alcohol','hangover','buzzed','stoned','high','weed','joint','shots','bar','pub',
     'party',
@@ -205,6 +259,11 @@ export const EMOTION_LEXICON = {
     'no self control','no willpower','no discipline','no restraint',
   ]},
   casual: { weight: 0, tense: 0, words: [
+
+    'no biggie','not a big deal','it’s whatever','meh either way','doesn’t matter much',
+    'six of one','either works','up to you really','your call','no preference tbh',
+    'just chilling','not much going on','same old same old','nothing new here',
+    'business as usual','typical day','ordinary stuff','nothing exciting',
     'dude','bro','man','guy','buddy','pal','yo','hey','sup','nah','yeah','yep','nope',
     'okay','fine','sure','cool','awesome','whatever',
     'omg','lol','lmao','tbh','imo','fr','no cap','low key','high key','deadass','bet',
@@ -224,6 +283,11 @@ export const EMOTION_LEXICON = {
     'i mean','you know','like i said','as i was saying',
   ]},
   confusion: { weight: 0, tense: 0.3, words: [
+
+    'not following','lost the thread','what’s happening here','totally lost rn',
+    'brain fog today','can’t wrap my head around this','doesn’t add up','still processing this',
+    'need this explained again','missing something here','not clicking for me','still confused tbh',
+    'going in circles','can’t make sense of it','head spinning a bit','mixed signals here',
     'confused','confusing','puzzled','puzzling','bewildered','baffled','perplexed','lost',
     'unclear','ambiguous','ambivalent','torn','undecided','second guessing',
     'گیج','سردرگم','مشوش','متحیر','حیران','سرگردان','دودل','مردد',
@@ -242,6 +306,10 @@ export const EMOTION_LEXICON = {
     'where was i','what was i saying','what was i thinking','what was the point',
   ]},
   surprise: { weight: 0.4, tense: 0.5, words: [
+
+    'wasn’t expecting that','out of left field fr','plot twist for real','didn’t see that one coming',
+    'that came out of nowhere','absolutely floored rn','no way that happened','wild turn of events',
+    'shocked tbh','still processing that shock','can’t believe that just happened','that escalated fast',
     'surprised','shocked','stunned','astonished','amazed','astounded','taken aback',
     'wow','whoa','holy cow','oh my god','unbelievable','mind blown',
     'jaw dropped','flabbergasted','gobsmacked','blindsided','unexpected',
