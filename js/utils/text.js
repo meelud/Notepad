@@ -16,12 +16,12 @@ export function tokenize(text) {
     if (ch === ' ' || ch === '\n') {
       tokens.push({ type: 'space', start: i, end: i + 1, text: ch });
       i++;
-    } else if ('.!?,;:'.includes(ch)) {
+    } else if ('.!?,;:؟،؛'.includes(ch)) {
       tokens.push({ type: 'punct', start: i, end: i + 1, text: ch });
       i++;
     } else {
       let j = i;
-      while (j < text.length && text[j] !== ' ' && text[j] !== '\n' && !'.!?,;:'.includes(text[j])) j++;
+      while (j < text.length && text[j] !== ' ' && text[j] !== '\n' && !'.!?,;:؟،؛'.includes(text[j])) j++;
       tokens.push({ type: 'word', start: i, end: j, text: text.slice(i, j) });
       i = j;
     }
@@ -36,7 +36,7 @@ export function tokenize(text) {
       let endType = 'statement';
       for (let m = k + 1; m < tokens.length; m++) {
         if (tokens[m].type === 'punct') {
-          if (tokens[m].text === '?') { endType = 'question'; break; }
+          if (tokens[m].text === '?' || tokens[m].text === '؟') { endType = 'question'; break; }
           if (tokens[m].text === '!') { endType = 'exclaim'; break; }
           if (tokens[m].text === '.') { endType = 'statement'; break; }
         }

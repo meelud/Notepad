@@ -21,11 +21,27 @@ export { EMOTION_LEXICON };
   }
 })();
 
-// ─── Word lookup table ─────────────────────────────────────────
-const WORD_LOOKUP = (() => {
+// ─── Phrase lookup table ────────────────────────────────────────
+// Lexicon entries range from single words to multi-word phrases
+// ("giddy up", "بهترین حس دنیارو دارم"). To make phrases matchable
+// against tokenized input, each phrase key is normalized through the
+// same word-extraction regex used on input text — so contractions/
+// hyphenated words ("can't wait" → "can t wait") line up on both sides.
+function normalizePhrase(str) {
+  return (str.toLowerCase().match(/[a-zA-Zا-ی]+/g) || []).join(' ');
+}
+
+let MAX_PHRASE_LEN = 1;
+const PHRASE_LOOKUP = (() => {
   const map = {};
   Object.values(EMOTION_LEXICON).forEach(({ weight, tense, words }) => {
-    words.forEach(w => { map[w] = { weight, tense }; });
+    words.forEach(w => {
+      const key = normalizePhrase(w);
+      if (!key) return;
+      map[key] = { weight, tense };
+      const len = key.split(' ').length;
+      if (len > MAX_PHRASE_LEN) MAX_PHRASE_LEN = len;
+    });
   });
   return map;
 })();
@@ -61,25 +77,39 @@ export function detectMood(text) {
     return negatorPositions.some(p => Math.abs(p - i) <= NEGATION_WINDOW && p !== i);
   }
 
-  // ── word scoring ─────────────────────────────────────────────
-  words.forEach((w, i) => {
-    const hit = WORD_LOOKUP[w];
-    if (!hit) return;
-    if (isNegated(i)) {
-      // flip and dampen (a negated emotion isn't the full opposite,
-      // and it reads as slightly more unsettled/ambiguous)
-      score += -hit.weight * 0.85;
-      tense += Math.abs(hit.tense) * 0.5 + 0.15;
-    } else {
-      score += hit.weight;
-      tense += hit.tense;
+  // ── phrase scoring ───────────────────────────────────────────
+  // Greedy longest-match-first scan: at each position, try the longest
+  // possible phrase span first and fall back to shorter spans (down to
+  // a single word) before advancing. This lets multi-word lexicon
+  // entries win over any shorter/overlapping single-word coincidence.
+  let i = 0;
+  while (i < words.length) {
+    let matchedLen = 0;
+    const maxLen = Math.min(MAX_PHRASE_LEN, words.length - i);
+    for (let len = maxLen; len >= 1; len--) {
+      const span = words.slice(i, i + len).join(' ');
+      const hit = PHRASE_LOOKUP[span];
+      if (hit) {
+        if (isNegated(i)) {
+          // flip and dampen (a negated emotion isn't the full opposite,
+          // and it reads as slightly more unsettled/ambiguous)
+          score += -hit.weight * 0.85;
+          tense += Math.abs(hit.tense) * 0.5 + 0.15;
+        } else {
+          score += hit.weight;
+          tense += hit.tense;
+        }
+        matchedLen = len;
+        break;
+      }
     }
-  });
+    i += matchedLen || 1;
+  }
 
   // ── punctuation adjustments ──────────────────────────────────
   const exclaim  = (text.match(/!/g) || []).length;
-  const question = (text.match(/\?/g) || []).length;
-  const ellipsis = (text.match(/\.\.\./g) || []).length;
+  const question = (text.match(/[?؟]/g) || []).length;
+  const ellipsis = (text.match(/\.\.\.|…/g) || []).length;
   score += exclaim * 0.4;
   score -= question * 0.25;
   score -= ellipsis * 0.3;

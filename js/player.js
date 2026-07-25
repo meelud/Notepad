@@ -95,16 +95,20 @@ export async function play() {
       playPunctuation(tok.text, dests, intensity);
       // '.' and ',' are meaningful silence now (no lead note) — keep the bars
       // still too, so the visual doesn't fake activity that isn't there.
-      const isSilent = tok.text === '.' || tok.text === ',';
+      const isSilent = tok.text === '.' || tok.text === ',' || tok.text === '،';
       if (!isSilent) animBars(0.2 * intensity);
       // pause durations (ms): period=420, question=380, exclaim=340, comma=200, other=150
-      const pause = tok.text === '.' ? 420 : tok.text === '?' ? 380 : tok.text === '!' ? 340 : tok.text === ',' ? 200 : 150;
+      const pause = (tok.text === '.') ? 420
+                  : (tok.text === '?' || tok.text === '؟') ? 380
+                  : (tok.text === '!') ? 340
+                  : (tok.text === ',' || tok.text === '،') ? 200
+                  : 150;
       await sleep(pause);
       continue;
     }
 
     wordsSeen++;
-    const wlen = tok.text.replace(/\W/g, '').length || 1;
+    const wlen = (tok.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
     const group = VOICE_GROUPS[tok.sentenceType] || VOICE_GROUPS.statement;
 
     // ambient density: thinner at paragraph start, thicker at end

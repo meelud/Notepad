@@ -1,7 +1,7 @@
 import { ac } from './context.js';
 import { getReverbNode } from './reverb.js';
 import { rnd, pick } from '../utils/rng.js';
-import { currentScale } from '../music/harmony.js';
+import { currentScale, chordFromScale } from '../music/harmony.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let ambTimers = [];
@@ -19,16 +19,6 @@ export function clearAmb() {
   ambTimers.forEach(id => clearTimeout(id));
   ambTimers = [];
   clockRunning = false;
-}
-
-// ─── Helpers ────────────────────────────────────────────────────
-function chordFromScaleLocal(scale, degreeRoot) {
-  const len = scale.length;
-  const root    = scale[degreeRoot % len] * (degreeRoot >= len ? 2 : 1);
-  const third   = scale[(degreeRoot + 2) % len] * ((degreeRoot + 2) >= len ? 2 : 1);
-  const fifth   = scale[(degreeRoot + 4) % len] * ((degreeRoot + 4) >= len ? 2 : 1);
-  const seventh = scale[(degreeRoot + 6) % len] * ((degreeRoot + 6) >= len ? 2 : 1);
-  return [root, third, fifth, seventh];
 }
 
 // ─── Ambient clock ──────────────────────────────────────────────
@@ -117,7 +107,7 @@ export function startAmbient(dests, isStopping) {
       let degree = pick(CHORD_DEGREES);
       if (degree === lastDegree) degree = pick(CHORD_DEGREES.filter(d => d !== lastDegree));
       lastDegree = degree;
-      playChord(chordFromScaleLocal(currentScale, degree), barDur * 1.15);
+      playChord(chordFromScale(currentScale, degree), barDur * 1.15);
       playTapeWarmth(barDur * 1.1);
     }
 

@@ -10,7 +10,7 @@ export function playPunctuation(ch, dests, intensity) {
   // the ambient pad/drone keeps breathing underneath, but nothing new is voiced
   // on top of it. This gives the piece real moments of rest instead of a
   // dedicated tone on every single mark.
-  if (ch === '.' || ch === ',') {
+  if (ch === '.' || ch === ',' || ch === '،') {
     return;
 
   } else if (ch === '!') {
@@ -23,7 +23,7 @@ export function playPunctuation(ch, dests, intensity) {
       osc.start(); osc.stop(c.currentTime + 0.5);
     });
 
-  } else if (ch === '?') {
+  } else if (ch === '?' || ch === '؟') {
     const osc = c.createOscillator(), g = c.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(293.66, c.currentTime);
