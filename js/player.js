@@ -7,6 +7,7 @@ import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
 import { deriveTextHarmony, hashText, wordNoteScale, currentScale } from './music/harmony.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
+import { findPersonaMessage, showPersonaToast } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let playing = false;
@@ -132,6 +133,8 @@ export async function play() {
     await sleep(spd);
   }
 
+  const completedNaturally = !stopping;
+
   stopping = true;
   clearAmb();
   pf.style.width = '100%';
@@ -149,6 +152,11 @@ export async function play() {
   render.style.display = 'none';
   editor.focus();
   editor.setSelectionRange(editor.value.length, editor.value.length);
+
+  if (completedNaturally) {
+    const msg = findPersonaMessage(text);
+    if (msg) showPersonaToast(msg);
+  }
 }
 
 // ─── Stop ───────────────────────────────────────────────────────

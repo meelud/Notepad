@@ -40,6 +40,16 @@ export function initUI() {
   document.addEventListener('keydown', (e) => {
     const meta = e.metaKey || e.ctrlKey;
 
+    // Attempt to stop Safari from opening Reader Mode on ⌘⇧R while typing.
+    // Safari sometimes intercepts this at the browser-chrome level, in
+    // which case preventDefault here can't override it — but this covers
+    // the cases where the keydown does reach the page first.
+    if (meta && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
     if (e.key === 'Enter' && e.shiftKey) {
       e.preventDefault();
       if (!isPlaying() && !bPlay.disabled) play();

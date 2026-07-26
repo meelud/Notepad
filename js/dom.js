@@ -10,3 +10,4 @@ export const viz     = document.getElementById('viz');
 export const bars    = viz.querySelectorAll('.bar');
 export const prog    = document.getElementById('prog');
 export const pf      = document.getElementById('pf');
+export const toast   = document.getElementById('toast');
