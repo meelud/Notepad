@@ -1,4 +1,4 @@
-import { MODE_ORDER } from './scales.js';
+import { TIERS } from './scales.js';
 import { EMOTION_LEXICON } from './lexicon-en.js';
 import { FA_LEXICON_COLLOQUIAL } from './lexicon-fa-colloquial.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
@@ -115,16 +115,32 @@ export function detectMood(text) {
   score -= ellipsis * 0.3;
   tense += exclaim * 0.5;
 
-  // ── normalize & map to mode ──────────────────────────────────
+  // ── normalize & map to tier (16 dark→bright levels, same
+  // resolution/contrast as the original palette) ──────────────
   const norm = score / Math.max(3, Math.sqrt(words.length));
   const tenseNorm = tense / Math.max(3, Math.sqrt(words.length));
 
   const clamped = Math.max(-1.5, Math.min(1.5, norm));
-  let idx = Math.round(((clamped + 1.5) / 3.0) * (MODE_ORDER.length - 1));
+  let idx = Math.round(((clamped + 1.5) / 3.0) * (TIERS.length - 1));
 
-  // high tension pushes toward darker modes
-  if (tenseNorm > 0.5 && idx > 3) idx = Math.max(1, idx - 4);
-  idx = Math.max(0, Math.min(MODE_ORDER.length - 1, idx));
+  // high tension nudges toward darker tiers — ramped smoothly instead
+  // of the old hard cutoff (which could snap a mildly positive text
+  // straight into an exotic/dissonant mode from a few exclamation
+  // marks alone), but keeping the same original max strength (~4
+  // tiers) now that we're back to the original 16-tier resolution.
+  if (tenseNorm > 0.3) {
+    const tensionPush = Math.min((tenseNorm - 0.3) * 8, 4);
+    idx = Math.max(0, idx - Math.round(tensionPush));
+  }
+  idx = Math.max(0, Math.min(TIERS.length - 1, idx));
 
-  return { mode: MODE_ORDER[idx], normScore: norm, tenseScore: tenseNorm };
+  // pick a specific mode within that tier — a small, independent,
+  // deterministic per-text hash so the same text always gets the same
+  // color, and multi-mode tiers add variety without touching contrast
+  let tinyHash = 0;
+  for (let k = 0; k < text.length; k++) tinyHash = (tinyHash * 31 + text.charCodeAt(k)) >>> 0;
+  const tier = TIERS[idx];
+  const mode = tier[tinyHash % tier.length];
+
+  return { mode, normScore: norm, tenseScore: tenseNorm };
 }

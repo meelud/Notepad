@@ -6,7 +6,7 @@
       "tenseScore": 0.15811388300841897
     },
     "en_negation": {
-      "mode": "minor",
+      "mode": "hirajoshi",
       "normScore": -0.3116666666666667,
       "tenseScore": 0.049999999999999996
     },
@@ -16,7 +16,7 @@
       "tenseScore": 0
     },
     "fa_negation": {
-      "mode": "minor",
+      "mode": "hirajoshi",
       "normScore": -0.3116666666666667,
       "tenseScore": 0.049999999999999996
     },
@@ -26,7 +26,7 @@
       "tenseScore": 0
     },
     "fa_comma_pause": {
-      "mode": "dorian",
+      "mode": "kumoi",
       "normScore": 0,
       "tenseScore": 0
     },
@@ -256,9 +256,9 @@
       "scaleLength": 7
     },
     "en_negation": {
-      "mood": "minor",
+      "mood": "hirajoshi",
       "root": 130.8127826502993,
-      "scaleLength": 7
+      "scaleLength": 5
     },
     "fa_simple_joy": {
       "mood": "melodicMinor",
@@ -266,9 +266,9 @@
       "scaleLength": 7
     },
     "fa_negation": {
-      "mood": "minor",
+      "mood": "hirajoshi",
       "root": 116.54094037952248,
-      "scaleLength": 7
+      "scaleLength": 5
     },
     "fa_question_mark": {
       "mood": "pentMinor",
@@ -276,9 +276,9 @@
       "scaleLength": 5
     },
     "fa_comma_pause": {
-      "mood": "dorian",
+      "mood": "kumoi",
       "root": 184.99721135581723,
-      "scaleLength": 7
+      "scaleLength": 5
     },
     "unicode_ellipsis": {
       "mood": "harmonicMinor",

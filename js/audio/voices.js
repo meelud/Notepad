@@ -361,4 +361,72 @@ export const VOICES = [
       osc.start(); osc.stop(c.currentTime+decay+0.1);
     });
   },
+
+  // 22 — Warm electric piano (soft Rhodes-like tone with a gentle
+  // tremolo and bell-like overtone — the "Within"-style emotional
+  // electric keyboard sound, not a rhythmic pattern)
+  (freq, vol, dur, dests) => {
+    const c = ac(); const rev = getReverbNode();
+    const osc1 = c.createOscillator(), osc2 = c.createOscillator();
+    const g = c.createGain(), g2 = c.createGain();
+    osc1.type = 'sine'; osc1.frequency.value = freq;
+    osc2.type = 'sine'; osc2.frequency.value = freq * 2.005; // slightly detuned bell overtone
+    g2.gain.value = 0.2;
+
+    // gentle tremolo — slow amplitude wobble, not a beat/groove
+    const lfo = c.createOscillator(), lfoGain = c.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = 4.3;
+    lfoGain.gain.value = vol * 0.07;
+    lfo.connect(lfoGain); lfoGain.connect(g.gain);
+
+    const decay = dur + rnd(1.2, 2.2);
+    g.gain.setValueAtTime(0, c.currentTime);
+    g.gain.linearRampToValueAtTime(vol * 0.5, c.currentTime + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + decay);
+
+    osc1.connect(g);
+    osc2.connect(g2); g2.connect(g);
+    g.connect(rev); dests.forEach(d => g.connect(d));
+
+    const stopAt = c.currentTime + decay + 0.1;
+    lfo.start(); osc1.start(); osc2.start();
+    lfo.stop(stopAt); osc1.stop(stopAt); osc2.stop(stopAt);
+  },
+
+  // 23 — Broken grains (irregular, glitch-leaning granular texture —
+  // same grain-buffer mechanism as Granular texture #20, but several
+  // short, unevenly-spaced micro-grains with randomized pitch instead
+  // of one smooth window — same family, genuinely new character)
+  (freq, vol, dur, dests) => {
+    const c = ac(); const rev = getReverbNode();
+    const grainCount = 4 + Math.floor(rnd(0, 4)); // 4–7 grains
+    let t = 0;
+    for (let i = 0; i < grainCount; i++) {
+      const glen = rnd(0.02, 0.06);
+      const buf = c.createBuffer(1, Math.ceil(c.sampleRate * glen), c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let j = 0; j < d.length; j++) {
+        d[j] = (rnd(0, 2) - 1) * Math.pow(Math.sin(Math.PI * j / d.length), 0.5);
+      }
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rnd(0.6, 1.8); // irregular pitch per grain
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = freq * rnd(1, 3); bp.Q.value = rnd(3, 8);
+      const g = c.createGain();
+      g.gain.value = vol * rnd(0.15, 0.4);
+      src.connect(bp); bp.connect(g); g.connect(rev);
+      dests.forEach(d2 => g.connect(d2));
+      src.start(c.currentTime + t);
+      t += rnd(0.01, dur / grainCount);
+    }
+    // faint sine anchor so the underlying pitch stays perceivable
+    // under the glitchy grains
+    const osc = c.createOscillator(), g2 = c.createGain();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    g2.gain.setValueAtTime(vol * 0.1, c.currentTime);
+    g2.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur + 0.3);
+    osc.connect(g2); g2.connect(rev); dests.forEach(d2 => g2.connect(d2));
+    osc.start(); osc.stop(c.currentTime + dur + 0.4);
+  },
 ];

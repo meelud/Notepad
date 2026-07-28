@@ -22,9 +22,9 @@ export function getAudioBlob() { return audioBlob; }
 
 // ─── Voice selection by sentence type ───────────────────────────
 const VOICE_GROUPS = {
-  statement: [0, 2, 5, 6, 10, 12, 13, 15, 16, 20, 21],
-  question:  [1, 4, 7, 9, 11, 17, 19, 20],
-  exclaim:   [1, 3, 5, 8, 9, 11, 14, 17, 18],
+  statement: [0, 2, 5, 6, 10, 12, 13, 15, 16, 20, 21, 22],
+  question:  [1, 4, 7, 9, 11, 17, 19, 20, 22, 23],
+  exclaim:   [1, 3, 5, 8, 9, 11, 14, 17, 18, 23],
 };
 
 // ─── Visualizer ─────────────────────────────────────────────────

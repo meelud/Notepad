@@ -1,4 +1,4 @@
-import { MODE_ORDER, buildScale } from './scales.js';
+import { TIERS, tierIndexOf, buildScale } from './scales.js';
 import { detectMood } from './mood.js';
 import { MODE_OFFSETS } from './scales.js';
 
@@ -28,8 +28,8 @@ export function hashText(text) {
 // ─── Harmony derivation ─────────────────────────────────────────
 /**
  * Analyzes text mood and derives a musical key + scale.
- * Darker modes (diminished…phrygian) use lower root candidates;
- * brighter modes (dorian…major) use mid-range roots.
+ * Darker tiers (diminished…harmonicMinor) use lower root candidates;
+ * brighter tiers (minor…major) use mid-range roots.
  *
  * @param {string} text — input text (EN/FA)
  * @returns {{ mood: string, root: number, scale: number[] }}
@@ -38,7 +38,7 @@ export function deriveTextHarmony(text) {
   const { mode, normScore } = detectMood(text);
   const h = hashText(text);
 
-  const modeIdx = MODE_ORDER.indexOf(mode);
+  const modeIdx = tierIndexOf(mode);
   const candidates = modeIdx <= 5 ? ROOT_CANDIDATES_LOW : ROOT_CANDIDATES_MID;
 
   const baseIdx = h % candidates.length;
@@ -60,7 +60,7 @@ export function deriveTextHarmony(text) {
  */
 export function wordNoteScale() {
   const out = [];
-  const modeIdx = MODE_ORDER.indexOf(currentMood);
+  const modeIdx = tierIndexOf(currentMood);
   let octaves;
   if (modeIdx <= 4)       octaves = [0.5, 1, 2];
   else if (modeIdx <= 8)  octaves = [0.5, 1, 2, 3];
