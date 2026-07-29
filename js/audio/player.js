@@ -1,4 +1,4 @@
-import { editor, render, bPlay, bStop, bSave, viz, bars, prog, pf } from './dom.js';
+import { editor, render, bPlay, bStop, bSave } from './dom.js';
 import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
@@ -7,6 +7,7 @@ import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
 import { deriveTextHarmony, hashText, wordNoteScale, currentScale } from './music/harmony.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
+import { findPersonaMessage, showPersonaToast } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let playing = false;
@@ -21,16 +22,10 @@ export function getAudioBlob() { return audioBlob; }
 
 // ─── Voice selection by sentence type ───────────────────────────
 const VOICE_GROUPS = {
-  statement: [0, 2, 5, 6, 10, 12, 13, 15, 16, 20, 21],
-  question:  [1, 4, 7, 9, 11, 17, 19, 20],
-  exclaim:   [1, 3, 5, 8, 9, 11, 14, 17, 18],
+  statement: [0, 2, 5, 6, 10, 12, 13, 15, 16, 20, 21, 22],
+  question:  [1, 4, 7, 9, 11, 17, 19, 20, 22, 23],
+  exclaim:   [1, 3, 5, 8, 9, 11, 14, 17, 18, 23],
 };
-
-// ─── Visualizer ─────────────────────────────────────────────────
-function animBars(vol) {
-  bars.forEach(b => { b.style.height = Math.round(rnd(1.5, vol * 17)) + 'px'; });
-  setTimeout(() => bars.forEach(b => b.style.height = '1.5px'), 120);
-}
 
 // ─── Playback ───────────────────────────────────────────────────
 /**
@@ -58,9 +53,6 @@ export async function play() {
   editor.style.display = 'none';
   render.style.display = 'block';
   render.innerHTML = esc(text);
-  viz.classList.add('on');
-  prog.classList.add('on');
-  pf.style.width = '0%';
   chunks = []; audioBlob = null;
 
   const c = ac();
@@ -81,10 +73,8 @@ export async function play() {
 
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
-  const totalWords = tokens.filter(t => t.type === 'word').length;
 
   let voiceIdx = pick(VOICE_GROUPS.statement);
-  let wordsSeen = 0;
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -95,10 +85,6 @@ export async function play() {
     if (tok.type === 'punct') {
       const intensity = 0.7 + 0.3;
       playPunctuation(tok.text, dests, intensity);
-      // '.' and ',' are meaningful silence now (no lead note) — keep the bars
-      // still too, so the visual doesn't fake activity that isn't there.
-      const isSilent = tok.text === '.' || tok.text === ',' || tok.text === '،';
-      if (!isSilent) animBars(0.2 * intensity);
       // pause durations (ms): period=420, question=380, exclaim=340, comma=200, other=150
       const pause = (tok.text === '.') ? 420
                   : (tok.text === '?' || tok.text === '؟') ? 380
@@ -109,7 +95,6 @@ export async function play() {
       continue;
     }
 
-    wordsSeen++;
     const wlen = (tok.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
     const group = VOICE_GROUPS[tok.sentenceType] || VOICE_GROUPS.statement;
 
@@ -123,32 +108,33 @@ export async function play() {
 
     if (rnd(0, 1) < 0.4) voiceIdx = pick(group);
     VOICES[voiceIdx](freq, vol, dur, dests);
-    animBars(vol);
 
-    // word-length → timing: base 300ms + 28ms per letter, capped at 600ms
-    const base = 300 + wlen * 28;
-    const spd  = Math.min(600, base) + rnd(-30, 50);
-    pf.style.width = Math.round((wordsSeen / totalWords) * 100) + '%';
+    // word-length → timing: base 380ms + 42ms per letter, no cap —
+    // longer words genuinely get more time instead of being clipped
+    const base = 380 + wlen * 42;
+    const spd  = base + rnd(-20, 60);
     await sleep(spd);
   }
 
+  const completedNaturally = !stopping;
+
   stopping = true;
   clearAmb();
-  pf.style.width = '100%';
   if (rec.state !== 'inactive') rec.stop();
   render.innerHTML = esc(text);
-  viz.classList.remove('on');
-  bars.forEach(b => b.style.height = '1.5px');
   playing = false;
   bPlay.disabled = false; bStop.disabled = true;
-  // fade out progress bar after 900ms
-  setTimeout(() => prog.classList.remove('on'), 900);
 
   // show continue prompt
   editor.style.display = '';
   render.style.display = 'none';
   editor.focus();
   editor.setSelectionRange(editor.value.length, editor.value.length);
+
+  if (completedNaturally) {
+    const msg = findPersonaMessage(text);
+    if (msg) showPersonaToast(msg);
+  }
 }
 
 // ─── Stop ───────────────────────────────────────────────────────
@@ -158,9 +144,6 @@ export function stop() {
   if (rec && rec.state !== 'inactive') rec.stop();
   editor.style.display = '';
   render.style.display = 'none';
-  viz.classList.remove('on');
-  prog.classList.remove('on');
-  bars.forEach(b => b.style.height = '1.5px');
   playing = false;
   bPlay.disabled = false; bStop.disabled = true;
 }

@@ -1,4 +1,4 @@
-import { editor, render, ph, bPlay, bStop, bSave, bClear, wcEl, prog, pf } from './dom.js';
+import { editor, render, ph, bPlay, bStop, bSave, bClear, wcEl } from './dom.js';
 import { play, stop, isPlaying, getAudioBlob, resetHarmony, clearAudioState } from './player.js';
 
 export function initUI() {
@@ -24,8 +24,6 @@ export function initUI() {
     bPlay.disabled = true; bSave.disabled = true;
     clearAudioState();
     wcEl.textContent = '0 words';
-    pf.style.width = '0%';
-    prog.classList.remove('on');
     resetHarmony();
   });
 
