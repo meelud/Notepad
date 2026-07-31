@@ -116,8 +116,15 @@ export function detectMood(text) {
   tense += exclaim * 0.5;
 
   // ── normalize & map to mode ──────────────────────────────────
-  const norm = score / Math.max(3, Math.sqrt(words.length));
-  const tenseNorm = tense / Math.max(3, Math.sqrt(words.length));
+  // Previously: Math.max(3, sqrt(words.length)) — too conservative,
+  // so almost all everyday text (even strongly emotional sentences)
+  // compressed into a narrow band around normScore≈0, landing only
+  // on the middle few modes (dorian/minor/melodicMinor) regardless
+  // of content. This gentler denominator lets genuinely emotional
+  // text reach the colorful/extreme modes, while truly neutral text
+  // still lands at normScore≈0 as it should.
+  const norm = score / Math.max(1.6, Math.sqrt(words.length) * 0.7);
+  const tenseNorm = tense / Math.max(1.6, Math.sqrt(words.length) * 0.7);
 
   const clamped = Math.max(-1.5, Math.min(1.5, norm));
   let idx = Math.round(((clamped + 1.5) / 3.0) * (MODE_ORDER.length - 1));

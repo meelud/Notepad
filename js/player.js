@@ -16,6 +16,7 @@ let rec = null;
 let chunks = [];
 let audioBlob = null;
 let harmonyLocked = false;
+let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
@@ -40,7 +41,8 @@ export async function play() {
   unlockIOSAudio();
 
   if (!harmonyLocked) {
-    deriveTextHarmony(text);
+    const harmonyInfo = deriveTextHarmony(text);
+    sessionTenseScore = harmonyInfo.tenseScore;
     harmonyLocked = true;
   }
 
@@ -102,17 +104,29 @@ export async function play() {
     const density = tok.paraPos === 'start' ? 0.55 : tok.paraPos === 'end' ? 1.35 : 1;
     setAmbientDensity(density);
 
+    // cadence: the last word right before sentence-ending punctuation
+    // gets a softer, longer note — a natural "landing" instead of an
+    // arbitrary cutoff, the way a spoken sentence settles at its end.
+    const next = playable[i + 1];
+    const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
+
     const freq = pick(wordNoteScale());
-    const vol  = rnd(0.18, 0.52);
-    const dur  = rnd(0.22, 0.45);
+    const vol  = isCadence ? rnd(0.20, 0.40) : rnd(0.18, 0.52);
+    const dur  = isCadence ? rnd(0.45, 0.75) : rnd(0.22, 0.45);
 
     if (rnd(0, 1) < 0.4) voiceIdx = pick(group);
     VOICES[voiceIdx](freq, vol, dur, dests);
 
     // word-length → timing: base 380ms + 42ms per letter, no cap —
-    // longer words genuinely get more time instead of being clipped
-    const base = 380 + wlen * 42;
-    const spd  = base + rnd(-20, 60);
+    // longer words genuinely get more time instead of being clipped.
+    // A small, clamped nudge from the text's overall tenseScore layers
+    // on top: tense/urgent text reads a little faster, calm text a
+    // little slower — capped at ±15% so it stays a subtle emotional
+    // cue, not a dramatic tempo swing.
+    const clampedTense = Math.max(-0.5, Math.min(1.0, sessionTenseScore));
+    const pacingFactor = 1 - clampedTense * 0.15;
+    const base = (380 + wlen * 42) * pacingFactor;
+    const spd  = (isCadence ? base * 1.2 : base) + rnd(-20, 60);
     await sleep(spd);
   }
 
@@ -151,6 +165,7 @@ export function stop() {
 // ─── Reset helpers ──────────────────────────────────────────────
 export function resetHarmony() {
   harmonyLocked = false;
+  sessionTenseScore = 0;
 }
 
 export function clearAudioState() {

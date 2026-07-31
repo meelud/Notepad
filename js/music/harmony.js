@@ -32,10 +32,10 @@ export function hashText(text) {
  * brighter modes (dorian…major) use mid-range roots.
  *
  * @param {string} text — input text (EN/FA)
- * @returns {{ mood: string, root: number, scale: number[] }}
+ * @returns {{ mood: string, root: number, scale: number[], normScore: number, tenseScore: number }}
  */
 export function deriveTextHarmony(text) {
-  const { mode, normScore } = detectMood(text);
+  const { mode, normScore, tenseScore } = detectMood(text);
   const h = hashText(text);
 
   const modeIdx = MODE_ORDER.indexOf(mode);
@@ -49,7 +49,7 @@ export function deriveTextHarmony(text) {
   currentMood = mode;
   currentScale = buildScale(root, mode);
 
-  return { mood: mode, root, scale: currentScale };
+  return { mood: mode, root, scale: currentScale, normScore, tenseScore };
 }
 
 // ─── Note scale for words ───────────────────────────────────────

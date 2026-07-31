@@ -12,6 +12,31 @@ const BEAT_SEC = 1.15;    // seconds per beat (~52 BPM)
 const BAR_BEATS = 4;       // beats per bar (4/4 time)
 const CHORD_DEGREES = [0, 2, 4, 6]; // scale degrees for chord voicing
 
+/**
+ * Picks the next chord degree with a preference for smoother motion:
+ * never repeats the previous degree, and weights closer degrees more
+ * heavily than distant jumps (still allows big leaps sometimes, just
+ * less often) — real chord progressions rarely leap around fully at
+ * random every bar.
+ * @param {number|null} prevDegree
+ * @returns {number}
+ */
+function pickNextDegree(prevDegree) {
+  if (prevDegree === null) return pick(CHORD_DEGREES);
+  const weights = CHORD_DEGREES.map(d => {
+    if (d === prevDegree) return 0; // never repeat, same as before
+    const dist = Math.abs(d - prevDegree);
+    return 1 / (dist + 0.5);
+  });
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = rnd(0, total);
+  for (let i = 0; i < CHORD_DEGREES.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return CHORD_DEGREES[i];
+  }
+  return CHORD_DEGREES[CHORD_DEGREES.length - 1];
+}
+
 // ─── Public API ─────────────────────────────────────────────────
 export function setAmbientDensity(v) { ambientDensity = v; }
 
@@ -104,8 +129,7 @@ export function startAmbient(dests, isStopping) {
     const barDur = BEAT_SEC * BAR_BEATS;
 
     if (beatInBar === 0) {
-      let degree = pick(CHORD_DEGREES);
-      if (degree === lastDegree) degree = pick(CHORD_DEGREES.filter(d => d !== lastDegree));
+      let degree = pickNextDegree(lastDegree);
       lastDegree = degree;
       playChord(chordFromScale(currentScale, degree), barDur * 1.15);
       playTapeWarmth(barDur * 1.1);
