@@ -14,13 +14,16 @@ import { toast } from './dom.js';
 // ─── Trigger topics ──────────────────────────────────────────────
 // Each topic: a list of trigger words (EN + FA, lowercase) and the
 // message shown when one of them appears in the user's text.
-// Testing with just "smoking" for now — more topics (horse, chaos,
-// etc.) will be added once this feels right.
 const TRIGGERS = [
   {
     topic: 'smoking',
     words: ['سیگار', 'سیگاری', 'دخانیات', 'cigarette', 'cigarettes', 'smoke', 'smoking'],
     message: "You're on about smoking, hope you have a good smoke today",
+  },
+  {
+    topic: 'lily',
+    words: ['lily', 'lilly', 'lilum', 'لیلی', 'لیلیوم'],
+    message: "You're on about something I used to have — it had the most beautiful look and smell you could imagine. Please take care of it.",
   },
 ];
 
@@ -56,7 +59,11 @@ export function showPersonaToast(message) {
   void toast.offsetWidth;
   toast.classList.add('on');
 
+  // duration scales with message length — a rough reading-time
+  // estimate (~60ms/char) with sane floor/ceiling — so longer
+  // messages stay up long enough to actually read.
+  const duration = Math.max(4200, Math.min(9000, message.length * 60));
   toastTimer = setTimeout(() => {
     toast.classList.remove('on');
-  }, 4200);
+  }, duration);
 }
