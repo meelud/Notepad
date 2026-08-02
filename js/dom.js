@@ -7,7 +7,3 @@ export const bSave   = document.getElementById('bSave');
 export const bClear  = document.getElementById('bClear');
 export const wcEl    = document.getElementById('wc');
 export const toast   = document.getElementById('toast');
-export const viz     = document.getElementById('viz');
-export const bars    = document.querySelectorAll('#viz .bar');
-export const prog    = document.getElementById('prog');
-export const pf      = document.getElementById('pf');
