@@ -17,6 +17,7 @@ let chunks = [];
 let audioBlob = null;
 let harmonyLocked = false;
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
+let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
@@ -43,6 +44,7 @@ export async function play() {
   if (!harmonyLocked) {
     const harmonyInfo = deriveTextHarmony(text);
     sessionTenseScore = harmonyInfo.tenseScore;
+    sessionNormScore = harmonyInfo.normScore;
     harmonyLocked = true;
   }
 
@@ -61,7 +63,15 @@ export async function play() {
   await c.resume();
   const sd = c.createMediaStreamDestination();
   const dests = [c.destination, sd];
-  ensureReverb(dests);
+
+  // mood-driven reverb space: dark/sad text sits in a more spacious,
+  // distant-feeling reverb; bright text stays drier and more present.
+  // This is the piece's emotional "room size", separate from anything
+  // per-word — a much more standard way to convey melancholy/distance
+  // than simply turning the volume down.
+  const clampedNorm = Math.max(-1.5, Math.min(1.5, sessionNormScore));
+  const moodWetness = 0.55 - ((clampedNorm + 1.5) / 3.0) * 0.30;
+  ensureReverb(dests, moodWetness);
 
   rec = new MediaRecorder(sd.stream);
   rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -75,6 +85,28 @@ export async function play() {
 
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
+
+  // sentence-position map: for each word token's index in `playable`,
+  // record its 1-based position and the total word count of its
+  // sentence — used to shape a gentle volume arc across the sentence
+  // rather than every word's loudness being fully independent.
+  const sentencePos = new Array(playable.length).fill(null);
+  {
+    let sentenceWordIdxs = [];
+    const flushSentence = () => {
+      const n = sentenceWordIdxs.length;
+      sentenceWordIdxs.forEach((idx, k) => { sentencePos[idx] = { pos: k + 1, total: n }; });
+      sentenceWordIdxs = [];
+    };
+    playable.forEach((tok, idx) => {
+      if (tok.type === 'word') {
+        sentenceWordIdxs.push(idx);
+      } else if (tok.type === 'punct' && ['.', '!', '?', '؟'].includes(tok.text)) {
+        flushSentence();
+      }
+    });
+    flushSentence(); // trailing sentence with no terminal punctuation, if any
+  }
 
   let voiceIdx = pick(VOICE_GROUPS.statement);
 
@@ -111,11 +143,31 @@ export async function play() {
     const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
 
     const freq = pick(wordNoteScale());
-    const vol  = isCadence ? rnd(0.20, 0.40) : rnd(0.18, 0.52);
-    const dur  = isCadence ? rnd(0.45, 0.75) : rnd(0.22, 0.45);
+
+    // gentle volume arc across the sentence: quieter near the edges,
+    // fuller in the middle — real phrasing breathes, it doesn't hold
+    // one flat loudness word to word. Sin-shaped, ±15%, clamped.
+    const sp = sentencePos[i] || { pos: 1, total: 1 };
+    const frac = sp.total > 1 ? (sp.pos - 1) / (sp.total - 1) : 0.5;
+    const volArc = 0.85 + Math.sin(Math.PI * frac) * 0.3;
+
+    const vol = Math.max(0.12, Math.min(0.6,
+      (isCadence ? rnd(0.20, 0.40) : rnd(0.18, 0.52)) * volArc
+    ));
+    const dur = isCadence ? rnd(0.45, 0.75) : rnd(0.22, 0.45);
+
+    // subtle stereo placement per word — real width instead of
+    // everything piling up dead-center. Kept modest (±0.35, not full
+    // hard-left/right) so it widens the space without being jarring.
+    // Only the word voices are panned; ambient pads and punctuation
+    // chimes stay centered as the stable "bed" underneath.
+    const panner = c.createStereoPanner();
+    panner.pan.value = rnd(-0.35, 0.35);
+    panner.connect(c.destination);
+    panner.connect(sd);
 
     if (rnd(0, 1) < 0.4) voiceIdx = pick(group);
-    VOICES[voiceIdx](freq, vol, dur, dests);
+    VOICES[voiceIdx](freq, vol, dur, [panner]);
 
     // word-length → timing: base 380ms + 42ms per letter, no cap —
     // longer words genuinely get more time instead of being clipped.
@@ -166,6 +218,7 @@ export function stop() {
 export function resetHarmony() {
   harmonyLocked = false;
   sessionTenseScore = 0;
+  sessionNormScore = 0;
 }
 
 export function clearAudioState() {

@@ -40,13 +40,14 @@ function buildReverb(c) {
  * Creates the reverb node once and connects it to all destinations.
  * Safe to call multiple times — only builds on first call.
  * @param {AudioNode[]} dests
+ * @param {number} [wetness=0.38] — dry/wet send level (0 = dry, 1 = full wet)
  */
-export function ensureReverb(dests) {
+export function ensureReverb(dests, wetness = 0.38) {
   const c = ac();
   if (!reverbNode) {
     reverbNode = buildReverb(c);
     reverbSend = c.createGain();
-    reverbSend.gain.value = 0.38; // dry/wet mix (0 = dry, 1 = full wet)
+    reverbSend.gain.value = wetness; // dry/wet mix (0 = dry, 1 = full wet)
     reverbNode.connect(reverbSend);
     dests.forEach(d => reverbSend.connect(d));
   }
