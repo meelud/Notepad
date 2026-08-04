@@ -59,8 +59,18 @@ export async function play() {
   render.innerHTML = esc(text);
   chunks = []; audioBlob = null;
 
-  const c = ac();
-  await c.resume();
+  let c;
+  try {
+    c = ac();
+    await c.resume();
+  } catch (err) {
+    showPersonaToast("Couldn't start audio here — your browser may not support it.");
+    playing = false;
+    bPlay.disabled = false; bStop.disabled = true;
+    editor.style.display = '';
+    render.style.display = 'none';
+    return;
+  }
   const sd = c.createMediaStreamDestination();
   const dests = [c.destination, sd];
 
@@ -73,13 +83,21 @@ export async function play() {
   const moodWetness = 0.55 - ((clampedNorm + 1.5) / 3.0) * 0.30;
   ensureReverb(dests, moodWetness);
 
-  rec = new MediaRecorder(sd.stream);
-  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-  rec.onstop = () => {
-    audioBlob = new Blob(chunks, { type: 'audio/webm' });
-    bSave.disabled = false;
-  };
-  rec.start();
+  // Recording is a nice-to-have, not essential — if MediaRecorder isn't
+  // available or fails to construct (some browsers/embedded webviews),
+  // playback should still work, just without the Save button.
+  try {
+    rec = new MediaRecorder(sd.stream);
+    rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    rec.onstop = () => {
+      audioBlob = new Blob(chunks, { type: 'audio/webm' });
+      bSave.disabled = false;
+    };
+    rec.start();
+  } catch (err) {
+    rec = null;
+    showPersonaToast("Can't record here, but playback still works — no Save this time.");
+  }
 
   startAmbient(dests, () => stopping);
 
@@ -186,7 +204,7 @@ export async function play() {
 
   stopping = true;
   clearAmb();
-  if (rec.state !== 'inactive') rec.stop();
+  if (rec && rec.state !== 'inactive') rec.stop();
   render.innerHTML = esc(text);
   playing = false;
   bPlay.disabled = false; bStop.disabled = true;

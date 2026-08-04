@@ -21,28 +21,28 @@
       "tenseScore": 0.09374999999999999
     },
     "fa_question_mark": {
-      "mode": "minor",
-      "normScore": -0.3125,
+      "mode": "melodicMinor",
+      "normScore": 0.27187500000000003,
       "tenseScore": 0
     },
     "fa_comma_pause": {
-      "mode": "dorian",
-      "normScore": 0,
+      "mode": "enigmatic",
+      "normScore": 0.584375,
       "tenseScore": 0
     },
     "unicode_ellipsis": {
-      "mode": "phrygian",
-      "normScore": -0.8125,
-      "tenseScore": 0.0625
+      "mode": "doubleHarmonic",
+      "normScore": -1.1875,
+      "tenseScore": 0.10000000000000002
     },
     "ascii_ellipsis": {
-      "mode": "phrygian",
-      "normScore": -0.8125,
-      "tenseScore": 0.0625
+      "mode": "doubleHarmonic",
+      "normScore": -1.1875,
+      "tenseScore": 0.10000000000000002
     },
     "mixed_en_fa": {
-      "mode": "melodicMinor",
-      "normScore": 1.1081025026876283,
+      "mode": "wholeTone",
+      "normScore": 1.4930223194106993,
       "tenseScore": 0.5832118435198044
     },
     "empty_string": {
@@ -271,29 +271,29 @@
       "scaleLength": 7
     },
     "fa_question_mark": {
-      "mood": "minor",
+      "mood": "melodicMinor",
       "root": 123.47082531403103,
       "scaleLength": 7
     },
     "fa_comma_pause": {
-      "mood": "dorian",
-      "root": 184.99721135581723,
+      "mood": "enigmatic",
+      "root": 195.99771799087466,
       "scaleLength": 7
     },
     "unicode_ellipsis": {
-      "mood": "phrygian",
-      "root": 73.4161919793519,
+      "mood": "doubleHarmonic",
+      "root": 69.29565774421802,
       "scaleLength": 7
     },
     "ascii_ellipsis": {
-      "mood": "phrygian",
-      "root": 58.27047018976124,
+      "mood": "doubleHarmonic",
+      "root": 55,
       "scaleLength": 7
     },
     "mixed_en_fa": {
-      "mood": "melodicMinor",
-      "root": 164.81377845643496,
-      "scaleLength": 7
+      "mood": "wholeTone",
+      "root": 174.61411571650194,
+      "scaleLength": 6
     }
   }
 }
