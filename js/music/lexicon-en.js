@@ -119,6 +119,7 @@ export const EMOTION_LEXICON = {
     'in a funk','feeling some type of way','down bad','not vibing today',
     'need a moment','processing a lot','carrying a lot right now',
     'sad','sadness','sorrow','grief','grieving','cry','crying','tears','weep','heartbroken',
+    'devastated','gutted','crushed','shattered','despondent','miserable',
     'lonely','alone','loneliness','empty','emptiness','hollow','loss','missing',
     'hurt','hurting','broken','depressed','blue','gloom','gloomy','melancholy','heavy',
     'غم','غمگین','اندوه','گریه','اشک','تنهایی','خالی','شکست','شکسته','از دست دادن',

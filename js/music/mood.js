@@ -101,8 +101,8 @@ export function detectMood(text) {
     words.forEach((w, i) => {
       if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i);
     });
-    function isNegated(i, spanLen = 1) {
-      return negatorPositions.some(p => (p < i || p >= i + spanLen) && Math.abs(p - i) <= NEGATION_WINDOW);
+    function isNegated(i) {
+      return negatorPositions.some(p => Math.abs(p - i) <= NEGATION_WINDOW && p !== i);
     }
 
     // ── position multipliers: contrast + intensity ───────────────
@@ -133,43 +133,25 @@ export function detectMood(text) {
     // longest possible phrase span first and fall back to shorter
     // spans (down to a single word) before advancing. This lets
     // multi-word lexicon entries win over shorter overlapping matches.
-    //
-    // Exact matching alone is brittle: a single inserted word breaks
-    // an otherwise-clear phrase match ("زندگی برام بی‌معنا شده" has
-    // "برام" sitting in the middle of the lexicon phrase "زندگی
-    // بی‌معنا شده"). For phrases of 3+ words, if the exact span
-    // doesn't match, also try a window one word longer with each
-    // single position removed — tolerates exactly one filler word.
-    // Kept to len>=3 only: shorter phrases are common enough that
-    // loosening them risks false-positive collisions.
     let i = 0;
     while (i < words.length) {
       let matchedLen = 0;
       const maxLen = Math.min(MAX_PHRASE_LEN, words.length - i);
       for (let len = maxLen; len >= 1; len--) {
         const span = words.slice(i, i + len).join(' ');
-        let hit = PHRASE_LOOKUP[span];
-        let consumedLen = len;
-
-        if (!hit && len >= 3 && i + len < words.length) {
-          const window = words.slice(i, i + len + 1);
-          for (let skip = 0; skip < window.length; skip++) {
-            const candidate = window.slice(0, skip).concat(window.slice(skip + 1)).join(' ');
-            const looseHit = PHRASE_LOOKUP[candidate];
-            if (looseHit) { hit = looseHit; consumedLen = len + 1; break; }
-          }
-        }
-
+        const hit = PHRASE_LOOKUP[span];
         if (hit) {
           const m = mult[i];
-          if (isNegated(i, consumedLen)) {
+          if (isNegated(i)) {
+            // flip and dampen (a negated emotion isn't the full opposite,
+            // and it reads as slightly more unsettled/ambiguous)
             score += -hit.weight * 0.85 * m;
             tense += (Math.abs(hit.tense) * 0.5 + 0.15) * m;
           } else {
             score += hit.weight * m;
             tense += hit.tense * m;
           }
-          matchedLen = consumedLen;
+          matchedLen = len;
           break;
         }
       }

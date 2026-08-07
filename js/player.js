@@ -29,6 +29,36 @@ const VOICE_GROUPS = {
   exclaim:   [1, 3, 5, 8, 9, 11, 14, 17, 18],
 };
 
+// ─── Mood-aware timbre bias ──────────────────────────────────────
+// Purely a selection bias within the existing 22 voices above — no
+// new voices, no changes to voices.js itself. Dark/melancholic text
+// leans toward airier, deeper, more textural voices; bright text
+// leans toward bell-like, playful, bolder ones. Classification is by
+// each voice's own description comment in voices.js.
+const DARK_VOICES = [2, 4, 12, 14, 16, 20, 21];   // Breath, Ghost chord, Choir pad, Sub thump, Bowed cello, Granular, Deep gong
+const BRIGHT_VOICES = [1, 3, 5, 8, 9, 10, 11, 17, 18, 19]; // Pluck, Bell, Piano, Marimba, Glass bell, Vibraphone, Music box, Kalimba, Brass swell, Celeste
+
+/**
+ * Picks a voice from the given sentenceType group, softly biased by
+ * mood. Neutral text (|normScore| small) or a group with no dark/bright
+ * overlap falls back to the exact original uniform pick — this only
+ * ever narrows the choice toward voices already valid for the current
+ * sentenceType, it never introduces a voice from outside that group.
+ * @param {number[]} group — sentenceType-appropriate voice indices
+ * @param {number} normScore — session mood score (-1.5 dark .. 1.5 bright)
+ */
+function pickMoodAwareVoice(group, normScore) {
+  const moodSet = normScore <= -0.15 ? DARK_VOICES
+                : normScore >= 0.15  ? BRIGHT_VOICES
+                : null;
+  const preferred = moodSet ? group.filter(v => moodSet.includes(v)) : [];
+  // 70% chance to favor the mood-matched subset when one exists,
+  // otherwise the full original group — keeps real variety instead
+  // of narrowing every word down to the same one or two voices.
+  if (preferred.length > 0 && rnd(0, 1) < 0.7) return pick(preferred);
+  return pick(group);
+}
+
 // ─── Playback ───────────────────────────────────────────────────
 /**
  * Main playback loop — tokenizes text, derives harmony,
@@ -126,7 +156,7 @@ export async function play() {
     flushSentence(); // trailing sentence with no terminal punctuation, if any
   }
 
-  let voiceIdx = pick(VOICE_GROUPS.statement);
+  let voiceIdx = pickMoodAwareVoice(VOICE_GROUPS.statement, sessionNormScore);
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -184,7 +214,7 @@ export async function play() {
     panner.connect(c.destination);
     panner.connect(sd);
 
-    if (rnd(0, 1) < 0.4) voiceIdx = pick(group);
+    if (rnd(0, 1) < 0.4) voiceIdx = pickMoodAwareVoice(group, sessionNormScore);
     VOICES[voiceIdx](freq, vol, dur, [panner]);
 
     // word-length → timing: base 380ms + 42ms per letter, no cap —
