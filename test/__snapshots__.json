@@ -1,0 +1,299 @@
+{
+  "mood": {
+    "en_simple_joy": {
+      "mode": "lydian",
+      "normScore": 1.1745602737768266,
+      "tenseScore": 0.22587697572631282
+    },
+    "en_negation": {
+      "mode": "harmonicMinor",
+      "normScore": -0.4722463145781585,
+      "tenseScore": 0.0757614408414158
+    },
+    "fa_simple_joy": {
+      "mode": "wholeTone",
+      "normScore": 0.6415330278717849,
+      "tenseScore": 0
+    },
+    "fa_negation": {
+      "mode": "harmonicMinor",
+      "normScore": -0.584375,
+      "tenseScore": 0.09374999999999999
+    },
+    "fa_question_mark": {
+      "mode": "melodicMinor",
+      "normScore": 0.27187500000000003,
+      "tenseScore": 0
+    },
+    "fa_comma_pause": {
+      "mode": "enigmatic",
+      "normScore": 0.584375,
+      "tenseScore": 0
+    },
+    "unicode_ellipsis": {
+      "mode": "doubleHarmonic",
+      "normScore": -1.1875,
+      "tenseScore": 0.10000000000000002
+    },
+    "ascii_ellipsis": {
+      "mode": "doubleHarmonic",
+      "normScore": -1.1875,
+      "tenseScore": 0.10000000000000002
+    },
+    "mixed_en_fa": {
+      "mode": "wholeTone",
+      "normScore": 1.4930223194106993,
+      "tenseScore": 0.5832118435198044
+    },
+    "empty_string": {
+      "mode": "dorian",
+      "normScore": 0,
+      "tenseScore": 0
+    }
+  },
+  "tokenize": {
+    "fa_punct_mix": [
+      {
+        "type": "word",
+        "text": "چیکار",
+        "sentenceType": "question",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "میکنی",
+        "sentenceType": "question",
+        "paraPos": "middle"
+      },
+      {
+        "type": "punct",
+        "text": "؟"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "حالت",
+        "sentenceType": "exclaim",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "خوبه",
+        "sentenceType": "exclaim",
+        "paraPos": "middle"
+      },
+      {
+        "type": "punct",
+        "text": "،"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "مرسی",
+        "sentenceType": "exclaim",
+        "paraPos": "end"
+      },
+      {
+        "type": "punct",
+        "text": "!"
+      }
+    ],
+    "en_basic": [
+      {
+        "type": "word",
+        "text": "Hello",
+        "sentenceType": "exclaim",
+        "paraPos": "middle"
+      },
+      {
+        "type": "punct",
+        "text": ","
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "world",
+        "sentenceType": "exclaim",
+        "paraPos": "middle"
+      },
+      {
+        "type": "punct",
+        "text": "!"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "How",
+        "sentenceType": "question",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "are",
+        "sentenceType": "question",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "you",
+        "sentenceType": "question",
+        "paraPos": "end"
+      },
+      {
+        "type": "punct",
+        "text": "?"
+      }
+    ],
+    "newline_split": [
+      {
+        "type": "word",
+        "text": "خط",
+        "sentenceType": "statement",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "اول",
+        "sentenceType": "statement",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": "\n"
+      },
+      {
+        "type": "word",
+        "text": "خط",
+        "sentenceType": "statement",
+        "paraPos": "middle"
+      },
+      {
+        "type": "space",
+        "text": " "
+      },
+      {
+        "type": "word",
+        "text": "دوم",
+        "sentenceType": "statement",
+        "paraPos": "end"
+      },
+      {
+        "type": "punct",
+        "text": "."
+      }
+    ]
+  },
+  "scales": {
+    "minor_110": [
+      110,
+      123.47082531403103,
+      130.8127826502993,
+      146.8323839587038,
+      164.81377845643496,
+      174.61411571650194,
+      195.99771799087466
+    ],
+    "major_220": [
+      220,
+      246.94165062806206,
+      277.1826309768721,
+      293.6647679174076,
+      329.6275569128699,
+      369.99442271163446,
+      415.3046975799451
+    ],
+    "dorian_440": [
+      440,
+      493.8833012561241,
+      523.2511306011972,
+      587.3295358348151,
+      659.2551138257398,
+      739.9888454232689,
+      783.9908719634986
+    ]
+  },
+  "hash": {
+    "hash_fa": 789372771,
+    "hash_en": 1794106052,
+    "hash_empty": 0
+  },
+  "harmony": {
+    "en_simple_joy": {
+      "mood": "lydian",
+      "root": 138.59131548843604,
+      "scaleLength": 7
+    },
+    "en_negation": {
+      "mood": "harmonicMinor",
+      "root": 61.735412657015516,
+      "scaleLength": 7
+    },
+    "fa_simple_joy": {
+      "mood": "wholeTone",
+      "root": 110,
+      "scaleLength": 6
+    },
+    "fa_negation": {
+      "mood": "harmonicMinor",
+      "root": 55,
+      "scaleLength": 7
+    },
+    "fa_question_mark": {
+      "mood": "melodicMinor",
+      "root": 123.47082531403103,
+      "scaleLength": 7
+    },
+    "fa_comma_pause": {
+      "mood": "enigmatic",
+      "root": 195.99771799087466,
+      "scaleLength": 7
+    },
+    "unicode_ellipsis": {
+      "mood": "doubleHarmonic",
+      "root": 69.29565774421802,
+      "scaleLength": 7
+    },
+    "ascii_ellipsis": {
+      "mood": "doubleHarmonic",
+      "root": 55,
+      "scaleLength": 7
+    },
+    "mixed_en_fa": {
+      "mood": "wholeTone",
+      "root": 174.61411571650194,
+      "scaleLength": 6
+    }
+  }
+}
