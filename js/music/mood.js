@@ -5,6 +5,25 @@ import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
 
 export { EMOTION_LEXICON };
 
+// ─── Intensity & contrast modifiers ─────────────────────────────
+// Words that scale a nearby emotion phrase's weight up/down, and
+// conjunctions after which the "real" sentiment usually lives
+// ("it was fun, but I'm exhausted" → exhaustion is what matters).
+const INTENSIFIERS = new Set([
+  'خیلی','کاملا','کاملاً','فوق','شدیدا','شدیداً','واقعا','واقعاً',
+  'حسابی','دقیقا','دقیقاً','قطعا','قطعاً','بی‌نهایت','بینهایت',
+  'extremely','very','totally','completely','absolutely','so',
+  'really','incredibly','utterly','super',
+]);
+const DIMINISHERS = new Set([
+  'یکم','کمی','نسبتا','نسبتاً','تقریبا','تقریباً',
+  'slightly','somewhat','fairly','rather','kinda','sorta',
+]);
+const CONTRAST_WORDS = new Set([
+  'اما','ولی','هرچند','گرچه',
+  'but','however','yet','though','although',
+]);
+
 // ─── Persian merge ─────────────────────────────────────────────
 // Merge the Persian colloquial/slang extension into EMOTION_LEXICON —
 // same weight/tense per category, words appended and de-duped.
@@ -60,50 +79,129 @@ const PHRASE_LOOKUP = (() => {
  * @returns {{ mode: string, normScore: number, tenseScore: number }}
  */
 export function detectMood(text) {
-  const lower = text.toLowerCase();
-  const words = lower.match(/[a-zA-Zا-ی]+/g) || [];
+  // Normalize English contractions before tokenizing — "don't"/"isn't"/
+  // "can't" etc. would otherwise split into meaningless fragments
+  // ("don","t") that never match the NEGATORS set, silently disabling
+  // negation for almost all English contractions.
+  const lower = text.toLowerCase().replace(/n['’]t\b/g, ' not');
+  const totalWords = (lower.match(/[a-zA-Zا-ی]+/g) || []).length;
   let score = 0, tense = 0;
 
-  // ── negator positions ────────────────────────────────────────
-  // find true-negator positions (excluding emphasis-only particles unless
-  // they co-occur with a real negator, which the window check handles
-  // naturally since we only flip when a genuine negator is in range)
-  const negatorPositions = [];
-  words.forEach((w, i) => {
-    if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i);
-  });
+  // Split into sentences so contrast weighting doesn't bleed across
+  // unrelated sentences. Punctuation itself isn't scored here (that
+  // happens separately below on the full text).
+  const sentences = lower.split(/[.!?؟]+/);
 
-  function isNegated(i) {
-    return negatorPositions.some(p => Math.abs(p - i) <= NEGATION_WINDOW && p !== i);
-  }
+  for (const sentence of sentences) {
+    const words = sentence.match(/[a-zA-Zا-ی]+/g) || [];
+    if (words.length === 0) continue;
 
-  // ── phrase scoring ───────────────────────────────────────────
-  // Greedy longest-match-first scan: at each position, try the longest
-  // possible phrase span first and fall back to shorter spans (down to
-  // a single word) before advancing. This lets multi-word lexicon
-  // entries win over any shorter/overlapping single-word coincidence.
-  let i = 0;
-  while (i < words.length) {
-    let matchedLen = 0;
-    const maxLen = Math.min(MAX_PHRASE_LEN, words.length - i);
-    for (let len = maxLen; len >= 1; len--) {
-      const span = words.slice(i, i + len).join(' ');
-      const hit = PHRASE_LOOKUP[span];
-      if (hit) {
-        if (isNegated(i)) {
-          // flip and dampen (a negated emotion isn't the full opposite,
-          // and it reads as slightly more unsettled/ambiguous)
-          score += -hit.weight * 0.85;
-          tense += Math.abs(hit.tense) * 0.5 + 0.15;
-        } else {
-          score += hit.weight;
-          tense += hit.tense;
-        }
-        matchedLen = len;
-        break;
+    // ── negator positions (scoped to this sentence) ──────────────
+    const negatorPositions = [];
+    words.forEach((w, i) => {
+      if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i);
+    });
+    function isNegated(i, spanLen = 1) {
+      return negatorPositions.some(p => (p < i || p >= i + spanLen) && Math.abs(p - i) <= NEGATION_WINDOW);
+    }
+
+    // ── position multipliers: contrast + intensity ───────────────
+    // Everything before the *last* contrast word ("but"/"ولی") in the
+    // sentence is dampened; everything after is boosted — the part
+    // after "but" is usually what the person actually means.
+    const mult = new Array(words.length).fill(1);
+    let lastContrastIdx = -1;
+    words.forEach((w, i) => { if (CONTRAST_WORDS.has(w)) lastContrastIdx = i; });
+    if (lastContrastIdx >= 0) {
+      for (let i = 0; i < words.length; i++) {
+        mult[i] *= i < lastContrastIdx ? 0.6 : (i > lastContrastIdx ? 1.5 : 1);
       }
     }
-    i += matchedLen || 1;
+    // intensifiers/diminishers scale the word(s) right after them
+    words.forEach((w, i) => {
+      if (INTENSIFIERS.has(w)) {
+        if (mult[i + 1] !== undefined) mult[i + 1] *= 1.6;
+        if (mult[i + 2] !== undefined) mult[i + 2] *= 1.3;
+      } else if (DIMINISHERS.has(w)) {
+        if (mult[i + 1] !== undefined) mult[i + 1] *= 0.6;
+        if (mult[i + 2] !== undefined) mult[i + 2] *= 0.75;
+      }
+    });
+
+    // ── phrase scoring ────────────────────────────────────────────
+    // Greedy longest-match-first scan: at each position, try the
+    // longest possible phrase span first and fall back to shorter
+    // spans (down to a single word) before advancing. This lets
+    // multi-word lexicon entries win over shorter overlapping matches.
+    //
+    // Exact matching alone is brittle: a single inserted word breaks
+    // an otherwise-clear phrase match ("زندگی برام بی‌معنا شده" has
+    // "برام" sitting in the middle of the lexicon phrase "زندگی
+    // بی‌معنا شده"). For phrases of 3+ words, if the exact span
+    // doesn't match, also try a window one word longer with each
+    // single position removed — tolerates exactly one filler word.
+    // Kept to len>=3 only: shorter phrases are common enough that
+    // loosening them risks false-positive collisions.
+    let i = 0;
+    while (i < words.length) {
+      let matchedLen = 0;
+      const maxLen = Math.min(MAX_PHRASE_LEN, words.length - i);
+      for (let len = maxLen; len >= 1; len--) {
+        const span = words.slice(i, i + len).join(' ');
+        let hit = PHRASE_LOOKUP[span];
+        let consumedLen = len;
+
+        if (!hit && len >= 3 && i + len < words.length) {
+          const window = words.slice(i, i + len + 1);
+          for (let skip = 0; skip < window.length; skip++) {
+            const candidate = window.slice(0, skip).concat(window.slice(skip + 1)).join(' ');
+            const looseHit = PHRASE_LOOKUP[candidate];
+            if (looseHit) { hit = looseHit; consumedLen = len + 1; break; }
+          }
+        }
+
+        if (hit) {
+          const m = mult[i];
+          if (isNegated(i, consumedLen)) {
+            score += -hit.weight * 0.85 * m;
+            tense += (Math.abs(hit.tense) * 0.5 + 0.15) * m;
+          } else {
+            score += hit.weight * m;
+            tense += hit.tense * m;
+          }
+          matchedLen = consumedLen;
+          break;
+        }
+      }
+
+      // conservative fallback: a single word that didn't match
+      // directly might carry a common Persian suffix (امیدی → امید).
+      // Try stripping one, dampened confidence since it's a fuzzy
+      // match rather than exact — only when nothing exact matched.
+      if (matchedLen === 0 && words[i].length >= 3) {
+        const SUFFIXES = ['های', 'یم', 'ید', 'ند', 'ها', 'ام', 'ات', 'اش', 'ی', 'م', 'ت', 'ش', 'ه'];
+        for (const suf of SUFFIXES) {
+          if (words[i].endsWith(suf) && words[i].length - suf.length >= 2) {
+            const stem = words[i].slice(0, -suf.length);
+            const hit = PHRASE_LOOKUP[stem];
+            if (hit) {
+              const m = mult[i];
+              if (isNegated(i)) {
+                score += -hit.weight * 0.85 * 0.85 * m;
+                tense += (Math.abs(hit.tense) * 0.5 + 0.15) * 0.85 * m;
+              } else {
+                score += hit.weight * 0.85 * m;
+                tense += hit.tense * 0.85 * m;
+              }
+              matchedLen = 1;
+              break;
+            }
+          }
+        }
+      }
+
+      i += matchedLen || 1;
+    }
   }
 
   // ── punctuation adjustments ──────────────────────────────────
@@ -116,8 +214,15 @@ export function detectMood(text) {
   tense += exclaim * 0.5;
 
   // ── normalize & map to mode ──────────────────────────────────
-  const norm = score / Math.max(3, Math.sqrt(words.length));
-  const tenseNorm = tense / Math.max(3, Math.sqrt(words.length));
+  // Previously: Math.max(3, sqrt(words.length)) — too conservative,
+  // so almost all everyday text (even strongly emotional sentences)
+  // compressed into a narrow band around normScore≈0, landing only
+  // on the middle few modes (dorian/minor/melodicMinor) regardless
+  // of content. This gentler denominator lets genuinely emotional
+  // text reach the colorful/extreme modes, while truly neutral text
+  // still lands at normScore≈0 as it should.
+  const norm = score / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
+  const tenseNorm = tense / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
 
   const clamped = Math.max(-1.5, Math.min(1.5, norm));
   let idx = Math.round(((clamped + 1.5) / 3.0) * (MODE_ORDER.length - 1));
