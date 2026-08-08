@@ -32,6 +32,7 @@ export const EMOTION_LEXICON = {
     'full of life','full of energy','full of pep','full of vim','full of vigor',
     'bright eyed','bushy tailed','raring to go','ready for anything','can\'t wait',
     'pumped about it','excited about it','looking forward to it','counting down the days',
+    'stoked af','good vibes only','living my best life','thriving','glow up','main character energy','no cap this is great','sending good energy','buzzing rn','pure joy fr',
   ]},
   love: { weight: 1.0, tense: 0, words: [
 
@@ -60,6 +61,7 @@ export const EMOTION_LEXICON = {
     'butterflies in my stomach','heart racing','heart pounding','heart melting',
     'love at first sight','falling in love','falling deeper','falling harder',
     'you complete me','you make me whole','you make me better','you make me happy',
+    'ride or die','soulmate energy','my person','ily','ilysm','obsessed with you','you\'re the one','forever mine','soft launch','head over heels fr',
   ]},
   calm: { weight: 0.7, tense: -0.3, words: [
 
@@ -84,6 +86,7 @@ export const EMOTION_LEXICON = {
     'restful','calming','comforting',
     'meditative','contemplative','reflective','introspective','mindful',
     'zen','nirvana','euphoria','serenity','tranquility',
+    'no stress','it is what it is','chilling','vibing','soft life','zen mode','breathe in breathe out','all good','easy does it','taking it slow',
   ]},
   hope: { weight: 0.8, tense: -0.1, words: [
 
@@ -111,6 +114,7 @@ export const EMOTION_LEXICON = {
     'fighting the good fight','staying the course','keeping on keeping on',
     'one day at a time','step by step','little by little','bit by bit',
     'slowly but surely','eventually','in time','sooner or later','one day',
+    'manifesting','it\'s giving hope','trust the timing','good things coming','watch this space','glow up incoming','level up','next chapter','on the come up','better days coming fr',
   ]},
   sadness: { weight: -1.0, tense: 0.1, words: [
 
@@ -138,6 +142,7 @@ export const EMOTION_LEXICON = {
     'feeling bleak','feeling desolate','feeling forsaken','feeling neglected',
     'in a dark place','in a funk','in a slump','in a rut','in a hole',
     'spirits are low','morale is low','energy is low','enthusiasm is low',
+    'in my feels','not okay rn','big sad','down bad','crying rn','emotional damage','heavy heart today','not vibing today','low key struggling','rough patch',
   ]},
   fear: { weight: -0.9, tense: 0.5, words: [
 
@@ -160,6 +165,7 @@ export const EMOTION_LEXICON = {
     'going crazy','losing my mind','spiraling','panicking',
     'short of breath','can\'t breathe','hyperventilating','gasping for air',
     'senses on high alert','hyperaware','hyper vigilant','on guard','on watch',
+    'anxious af','spiraling rn','panic mode','on edge','freaking tf out','nervous wreck','shook','uneasy af','stressed tf out','dread creeping in',
   ]},
   anger: { weight: -0.7, tense: 1.0, words: [
 
@@ -183,6 +189,7 @@ export const EMOTION_LEXICON = {
     'under my skin','under my nails','in my face','in my grill','in my space',
     'back off','get out of my face',
     'take a hike','beat it','scram','vamoose','skedaddle','make like a tree',
+    'so done','over it fr','fuming rn','pissed tf off','done with this','not today','triggered','mad af','irritated af','fed up fr',
   ]},
   dark: { weight: -0.8, tense: 0.4, words: [
 
@@ -208,6 +215,7 @@ export const EMOTION_LEXICON = {
     'nothing left','nothing remains','nothing survives','nothing endures',
     'hollow inside','empty inside','dead inside','numb inside',
     'black hole','nothingness','oblivion','eternal darkness',
+    'empty inside','numb af','existential crisis','burnt out','done with everything','running on empty','soul tired','checked out','nothing left in me','hollowed out',
   ]},
   nostalgia: { weight: -0.2, tense: -0.1, words: [
 
@@ -233,6 +241,7 @@ export const EMOTION_LEXICON = {
     'bittersweet memories','bittersweet feelings','bittersweet taste',
     'aching for the past','yearning for the past','longing for the past','hungering for the past',
     'ancient times','bygone era','bygone days','lost era',
+    'throwback','miss the old days','simpler times','remember when','good old days fr','core memory','nostalgic af','feels like yesterday','back then','old school vibes',
   ]},
   vice: { weight: -0.3, tense: 0.2, words: [
 
@@ -258,6 +267,7 @@ export const EMOTION_LEXICON = {
     'addicted','hooked','can\'t quit',
     'one thing led to another','next thing i knew','before i knew it',
     'no self control','no willpower','no discipline','no restraint',
+    'one more round','no chill tonight','yolo','sending it','bad decisions szn','regret nothing','living dangerously','treat yourself','cheat day','no regrets tonight',
   ]},
   casual: { weight: 0, tense: 0, words: [
 
@@ -282,6 +292,7 @@ export const EMOTION_LEXICON = {
     'anyway','anyways','moving on','speaking of which','by the way','that said',
     'kind of','sort of','sorta','kinda','essentially',
     'i mean','you know','like i said','as i was saying',
+    'lowkey','highkey','fr fr','no cap','bet','say less','it\'s giving','slay','periodt','tbh ngl','vibe check','same energy','big mood','felt that','literally me',
   ]},
   confusion: { weight: 0, tense: 0.3, words: [
 
@@ -305,6 +316,7 @@ export const EMOTION_LEXICON = {
     'lost the plot','lost my train of thought','lost track','lost where i was',
     'back to square one','starting over','starting from scratch','starting from the beginning',
     'where was i','what was i saying','what was i thinking','what was the point',
+    'lost rn','so confused','wait what','make it make sense','brain not braining','confused af','what is happening','lost the plot fr','idk anymore','none of this makes sense',
   ]},
   surprise: { weight: 0.4, tense: 0.5, words: [
 
@@ -326,5 +338,6 @@ export const EMOTION_LEXICON = {
     'dumbfounded','stupefied','thunderstruck',
     'mind boggling','mind blowing','mind numbing','brain melting','head exploding',
     'unprecedented','unheard of','unimagined','unforeseen','unanticipated',
+    'no way fr','shut up no way','omg wait','plot twist fr','did not see that coming','wild fr','unreal fr','shooketh','not expecting that','caught me off guard fr',
   ]},
 };
