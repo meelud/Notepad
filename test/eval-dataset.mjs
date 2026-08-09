@@ -140,4 +140,21 @@ export const EVAL_DATASET = [
   ['چه روز فوق‌العاده‌ای، ماشینم هم خراب شد', -1], // sarcastic
   ["oh great, another Monday", -1], // sarcastic
   ['واقعا که! باز هم همون داستان همیشگی', -1],
+  // ── Additional coverage using newly-added lexicon entries ────
+  ['I am absolutely elated today', 2],
+  ['feeling grounded and at peace', 1],
+  ['heartbroken and grieving right now', -2],
+  ['livid about what happened', -2],
+  ['stunned, did not see that coming', 1],
+  ['reminiscing about the good times', -1],
+  ['baffled by this whole situation', 0],
+  ['staying hopeful things will improve', 1],
+  ['خیلی خوشحال شدم امروز', 2],
+  ['قلبم برات میتپه هر روز', 2],
+  ['دلم قرصه و آرومم کامل', 1],
+  ['قلبم درد میکنه از تنهایی', -2],
+  ['خشمم کنترل نشدنیه الان', -2],
+  ['واقعا غافلگیر شدم از این خبر', 1],
+  ['یاد اون آدما افتادم امروز', -1],
+  ['سردرگمم واقعا نمیدونم چیکار کنم', 0],
 ];
