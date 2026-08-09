@@ -38,25 +38,48 @@ const VOICE_GROUPS = {
 const DARK_VOICES = [2, 4, 12, 14, 16, 20, 21];   // Breath, Ghost chord, Choir pad, Sub thump, Bowed cello, Granular, Deep gong
 const BRIGHT_VOICES = [1, 3, 5, 8, 9, 10, 11, 17, 18, 19]; // Pluck, Bell, Piano, Marimba, Glass bell, Vibraphone, Music box, Kalimba, Brass swell, Celeste
 
+// ─── Attack-family classification ────────────────────────────────
+// Extracted from each voice's ACTUAL gain envelope in voices.js (not
+// its descriptive comment): does the note start at/near full gain
+// immediately (percussive), or ramp up over 80ms+ (swelling)? This is
+// the real structural signal for sequencing — a percussive voice
+// landing right after a slow-swelling one (or vice versa) with no
+// transition is what reads as a disjointed string of timbres rather
+// than a phrase. Notably, this split already correlates strongly with
+// DARK/BRIGHT above (ramped ≈ dark/airy, percussive ≈ bright/lively),
+// so the two signals reinforce rather than fight each other.
+const PERCUSSIVE_VOICES = [1, 3, 7, 8, 9, 10, 11, 14, 17, 19, 20];
+const RAMPED_VOICES = [0, 2, 4, 5, 6, 12, 13, 15, 16, 18, 21];
+
 /**
- * Picks a voice from the given sentenceType group, softly biased by
- * mood. Neutral text (|normScore| small) or a group with no dark/bright
- * overlap falls back to the exact original uniform pick — this only
- * ever narrows the choice toward voices already valid for the current
- * sentenceType, it never introduces a voice from outside that group.
+ * Picks a voice from the sentenceType group, layering two signals:
+ * mood (emotional color) and attack-family (structural/sequential
+ * coherence — keeps a sentence's timbral "gesture" consistent instead
+ * of jumping between percussive and swelling voices word to word).
+ * Fallback chain guarantees a valid pick even if the intersection is
+ * empty: mood∩family → family alone → mood alone → full group.
  * @param {number[]} group — sentenceType-appropriate voice indices
  * @param {number} normScore — session mood score (-1.5 dark .. 1.5 bright)
+ * @param {number[]} family — PERCUSSIVE_VOICES or RAMPED_VOICES
  */
-function pickMoodAwareVoice(group, normScore) {
+function pickOrchestVoice(group, normScore, family) {
   const moodSet = normScore <= -0.15 ? DARK_VOICES
                 : normScore >= 0.15  ? BRIGHT_VOICES
                 : null;
-  const preferred = moodSet ? group.filter(v => moodSet.includes(v)) : [];
-  // 70% chance to favor the mood-matched subset when one exists,
-  // otherwise the full original group — keeps real variety instead
-  // of narrowing every word down to the same one or two voices.
-  if (preferred.length > 0 && rnd(0, 1) < 0.7) return pick(preferred);
-  return pick(group);
+  let candidates = group.filter(v => family.includes(v) && (!moodSet || moodSet.includes(v)));
+  if (candidates.length === 0) candidates = group.filter(v => family.includes(v));
+  if (candidates.length === 0 && moodSet) candidates = group.filter(v => moodSet.includes(v));
+  if (candidates.length === 0) candidates = group;
+  return pick(candidates);
+}
+
+/** Picks the attack-family a new sentence should "live in" — follows
+ * the mood's natural correlation (dark→ramped, bright→percussive),
+ * coin-flip for neutral text. */
+function familyForMood(normScore) {
+  if (normScore <= -0.15) return RAMPED_VOICES;
+  if (normScore >= 0.15) return PERCUSSIVE_VOICES;
+  return pick([PERCUSSIVE_VOICES, RAMPED_VOICES]);
 }
 
 // ─── Playback ───────────────────────────────────────────────────
@@ -156,7 +179,8 @@ export async function play() {
     flushSentence(); // trailing sentence with no terminal punctuation, if any
   }
 
-  let voiceIdx = pickMoodAwareVoice(VOICE_GROUPS.statement, sessionNormScore);
+  let currentFamily = familyForMood(sessionNormScore);
+  let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily);
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -214,7 +238,21 @@ export async function play() {
     panner.connect(c.destination);
     panner.connect(sd);
 
-    if (rnd(0, 1) < 0.4) voiceIdx = pickMoodAwareVoice(group, sessionNormScore);
+    // refresh the sentence's timbral "family" at each new sentence —
+    // keeps a stable percussive-vs-swelling identity across the whole
+    // sentence instead of rerolling structure word to word
+    if (sp.pos === 1) currentFamily = familyForMood(sessionNormScore);
+
+    if (rnd(0, 1) < 0.4) {
+      // cadence words may deliberately cross into the opposite family
+      // as a resolution gesture (e.g. a percussive sentence settling
+      // into a swelling voice at its very end) — everywhere else,
+      // voice changes stay within the sentence's established family
+      const pickFamily = isCadence
+        ? (currentFamily === PERCUSSIVE_VOICES ? RAMPED_VOICES : PERCUSSIVE_VOICES)
+        : currentFamily;
+      voiceIdx = pickOrchestVoice(group, sessionNormScore, pickFamily);
+    }
     VOICES[voiceIdx](freq, vol, dur, [panner]);
 
     // word-length → timing: base 380ms + 42ms per letter, no cap —
