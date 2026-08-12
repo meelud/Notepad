@@ -33,7 +33,7 @@ export const EMOTION_LEXICON = {
     'bright eyed','bushy tailed','raring to go','ready for anything','can\'t wait',
     'pumped about it','excited about it','looking forward to it','counting down the days',
     'stoked af','good vibes only','living my best life','thriving','glow up','main character energy','no cap this is great','sending good energy','buzzing rn','pure joy fr',
-    'joyous','cheered up','in a good mood','on a roll','over the moon rn','so glad','grateful af','happy camper','all smiles rn','loving life','best mood ever',
+    'joyous','cheered up','in a good mood','on a roll','over the moon rn','so glad','grateful af','happy camper','all smiles rn','loving life','best mood ever', 'cheered'
   ]},
   love: { weight: 1.0, tense: 0, words: [
 
@@ -63,7 +63,7 @@ export const EMOTION_LEXICON = {
     'love at first sight','falling in love','falling deeper','falling harder',
     'you make me whole','you make me better','you make me happy',
     'ride or die','soulmate energy','my person','ily','ilysm','obsessed with you','you\'re the one','forever mine','soft launch','head over heels fr',
-    'adore you','my everything','love of my life','cherish you','devoted to you','affectionate','tender feelings','my rock',
+    'adore you','my everything','love of my life','cherish you','devoted to you','affectionate','tender feelings','my rock', 'devoted'
   ]},
   calm: { weight: 0.7, tense: -0.3, words: [
 
@@ -118,7 +118,7 @@ export const EMOTION_LEXICON = {
     'one day at a time','step by step','little by little','bit by bit',
     'slowly but surely','eventually','in time','sooner or later','one day',
     'manifesting','it\'s giving hope','level up','next chapter','better days coming fr',
-    'hopeful af','looking up','brighter days','silver lining','faith in this','believing','confident it will work','positive outlook','staying hopeful','things will improve','light ahead','encouraged','reassured','promising','trust the process','onward','pushing forward',
+    'hopeful af','looking up','brighter days','silver lining','faith in this','believing','confident it will work','positive outlook','staying hopeful','things will improve','light ahead','encouraged','reassured','promising','trust the process','onward','pushing forward', 'confident', 'trust'
   ]},
   sadness: { weight: -1.0, tense: 0.1, words: [
 
@@ -147,7 +147,7 @@ export const EMOTION_LEXICON = {
     'in a dark place','in a slump','in a rut','in a hole',
     'spirits are low','morale is low','energy is low','enthusiasm is low',
     'in my feels','not okay rn','big sad','crying rn','emotional damage','low key struggling','rough patch',
-    'sorrowful','downcast','blue af','disheartened','forlorn','melancholic','tearful','aching inside','hurting bad','low mood',
+    'sorrowful','downcast','blue af','disheartened','forlorn','melancholic','tearful','aching inside','hurting bad','low mood', 'aching'
   ]},
   fear: { weight: -0.9, tense: 0.5, words: [
 
@@ -223,7 +223,7 @@ export const EMOTION_LEXICON = {
     'hollow inside','empty inside','dead inside','numb inside',
     'black hole','nothingness','oblivion','eternal darkness',
     'numb af','existential crisis','burnt out','done with everything','soul tired','checked out','nothing left in me','hollowed out',
-    'hopeless af','desolate','empty af','nihilistic','defeated','broken inside','giving up','cant go on','wrecked','beyond repair','numb to it all',
+    'hopeless af','desolate','empty af','nihilistic','defeated','broken inside','giving up','cant go on','wrecked','beyond repair','numb to it all', 'numb'
   ]},
   nostalgia: { weight: -0.2, tense: -0.1, words: [
 
@@ -250,7 +250,7 @@ export const EMOTION_LEXICON = {
     'aching for the past','yearning for the past','longing for the past','hungering for the past',
     'ancient times','bygone era','bygone days','lost era',
     'simpler times','remember when','good old days fr','core memory','nostalgic af','feels like yesterday','back then',
-    'wistful','longing for then','miss those days','sentimental','bittersweet memory','looking back fondly','the good times','used to be','memories flooding back','misty eyed','fond recollection',
+    'wistful','longing for then','miss those days','sentimental','bittersweet memory','looking back fondly','the good times','used to be','memories flooding back','misty eyed','fond recollection', 'reminisce'
   ]},
   vice: { weight: -0.3, tense: 0.2, words: [
 
@@ -277,7 +277,7 @@ export const EMOTION_LEXICON = {
     'one thing led to another','next thing i knew','before i knew it',
     'no self control','no willpower','no discipline','no restraint',
     'no chill tonight','yolo','sending it','bad decisions szn','regret nothing','living dangerously','treat yourself','cheat day','no regrets tonight',
-    'indulging','giving in','tempted','cant resist','slipping up','bad influence','overdoing it','losing control','addicted to it','cant stop','one more time','breaking the rule',
+    'indulging','giving in','tempted','cant resist','slipping up','bad influence','overdoing it','losing control','addicted to it','cant stop','one more time','breaking the rule', 'indulge'
   ]},
   casual: { weight: 0, tense: 0, words: [
 
@@ -328,7 +328,7 @@ export const EMOTION_LEXICON = {
     'back to square one','starting over','starting from scratch','starting from the beginning',
     'where was i','what was i saying','what was i thinking','what was the point',
     'lost rn','so confused','wait what','make it make sense','brain not braining','confused af','what is happening','lost the plot fr','idk anymore','none of this makes sense',
-    'disoriented','mixed up','cant tell','unsure','uncertain','stumped','at a loss','muddled','foggy headed',
+    'disoriented','mixed up','cant tell','unsure','uncertain','stumped','at a loss','muddled','foggy headed', 'foggy'
   ]},
   surprise: { weight: 0.4, tense: 0.5, words: [
 
@@ -351,6 +351,6 @@ export const EMOTION_LEXICON = {
     'mind boggling','mind blowing','mind numbing','brain melting','head exploding',
     'unprecedented','unheard of','unimagined','unforeseen','unanticipated',
     'no way fr','shut up no way','omg wait','plot twist fr','did not see that coming','wild fr','unreal fr','shooketh','not expecting that','caught me off guard fr',
-    'floored','mind blown fr','speechless rn','never expected that','caught me off guard','wow just wow','unbelievable honestly',
+    'floored','mind blown fr','speechless rn','never expected that','caught me off guard','wow just wow','unbelievable honestly', 'speechless'
   ]},
 };

@@ -25,6 +25,11 @@ const TRIGGERS = [
     words: ['lily', 'lilly', 'lilum', 'لیلی', 'لیلیوم'],
     message: "You're on about something I used to have — it had the most beautiful look and smell you could imagine. Please take care of it.",
   },
+  {
+    topic: 'kiyana',
+    words: ['کیانا', 'kiyana', 'kiyanaaa'],
+    message: "You’ve named someone dearly loved by the creator. Hopefully she catches me soon.",
+  },
 ];
 
 let toastTimer = null;

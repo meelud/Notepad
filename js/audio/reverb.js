@@ -1,5 +1,5 @@
 import { ac } from './context.js';
-import { computeReverbProfile, renderStereoImpulse } from './reverb-math.js';
+import { computeReverbProfile, renderStereoImpulse, registerModifier } from './reverb-math.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let reverbNodes = []; // every node created for this room — for teardown
@@ -97,7 +97,10 @@ export function ensureReverb(dests, state = {}, seed = 0xCAFE) {
  * Smoothly updates live parameters (wet, early reflections, role sends)
  * without rebuilding impulse responses. Sized for per-word density/energy
  * changes — short exp smoothing makes moves gradual, not clicks.
- * @param {Object} state { normScore, density, energy }
+ * Register-aware: if `frequency` is provided, all three role sends are
+ * scaled by registerModifier(frequency) so bass notes excite more room
+ * modes and treble notes stay more direct.
+ * @param {Object} state { normScore, density, energy, frequency? }
  */
 export function updateReverb(state = {}) {
   if (!wetGain || !erGain) return;
@@ -105,11 +108,12 @@ export function updateReverb(state = {}) {
   const profile = computeReverbProfile(state);
   const t = c.currentTime;
   const k = 0.05;
+  const regMod = registerModifier(state.frequency || 440);
   wetGain.gain.setTargetAtTime(profile.wet, t, k);
   erGain.gain.setTargetAtTime(profile.erLevel, t, k);
-  leadSend.gain.setTargetAtTime(profile.roleSend.lead, t, k);
-  padSend.gain.setTargetAtTime(profile.roleSend.pad, t, k);
-  fxSend.gain.setTargetAtTime(profile.roleSend.fx, t, k);
+  leadSend.gain.setTargetAtTime(profile.roleSend.lead * regMod, t, k);
+  padSend.gain.setTargetAtTime(profile.roleSend.pad * regMod, t, k);
+  fxSend.gain.setTargetAtTime(profile.roleSend.fx * regMod, t, k);
 }
 
 export function resetReverb() {

@@ -7,7 +7,7 @@
  *
  * Usage: node test/reverb-math.mjs
  */
-import { computeReverbProfile, renderImpulseResponse, renderStereoImpulse, mulberry32 } from '../js/audio/reverb-math.js';
+import { computeReverbProfile, renderImpulseResponse, renderStereoImpulse, mulberry32, registerModifier } from '../js/audio/reverb-math.js';
 
 let fails = 0;
 function check(name, cond, detail = '') {
@@ -124,6 +124,23 @@ console.log('== render is deterministic ==');
   const a = renderImpulseResponse(sr, profile, 7);
   const b = renderImpulseResponse(sr, profile, 7);
   check('same seed → identical IR', a.length === b.length && a.every((v, i) => v === b[i]));
+}
+
+console.log('== register modifier ==');
+{
+  const bass = registerModifier(110);    // A2 — low bass
+  const mid  = registerModifier(440);    // A4 — reference
+  const treble = registerModifier(4000); // ~C7 — high treble
+  check('reference frequency (A4) returns 1.0', approx(mid, 1.0, 0.001), mid);
+  check('bass returns > 1.0 (excites more room)', bass > 1.0, bass);
+  check('treble returns < 1.0 (stays more direct)', treble < 1.0, treble);
+  check('monotonic: higher freq → lower multiplier',
+    bass > mid && mid > treble, `${bass} > ${mid} > ${treble}`);
+  check('bounded [0.80, 1.20]',
+    bass <= 1.20 && treble >= 0.80, `bass=${bass}, treble=${treble}`);
+  check('edge: 0 or negative freq returns 1.0 (safe fallback)',
+    registerModifier(0) === 1.0 && registerModifier(-100) === 1.0);
+  check('edge: NaN returns 1.0', registerModifier(NaN) === 1.0);
 }
 
 console.log(`\n${fails === 0 ? 'ALL PASS' : fails + ' FAILURE(S)'}`);

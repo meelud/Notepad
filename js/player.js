@@ -212,9 +212,6 @@ export async function play() {
     // ambient density: thinner at paragraph start, thicker at end
     const density = tok.paraPos === 'start' ? 0.55 : tok.paraPos === 'end' ? 1.35 : 1;
     setAmbientDensity(density);
-    // reverb follows the same density: sparse passages sit further back in
-    // a huge room, dense ones pull the depth layers in so nothing smears.
-    updateReverb({ normScore: sessionNormScore, density, energy: startEnergy });
 
     // cadence: the last word right before sentence-ending punctuation
     // gets a softer, longer note — a natural "landing" instead of an
@@ -223,6 +220,10 @@ export async function play() {
     const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
 
     const freq = pick(wordNoteScale());
+
+    // reverb follows density + register: sparse passages sit further back,
+    // bass notes excite more room modes, treble stays present.
+    updateReverb({ normScore: sessionNormScore, density, energy: startEnergy, frequency: freq });
 
     // gentle volume arc across the sentence: quieter near the edges,
     // fuller in the middle — real phrasing breathes, it doesn't hold
