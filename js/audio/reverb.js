@@ -1,54 +1,127 @@
 import { ac } from './context.js';
-import { rnd } from '../utils/rng.js';
+import { computeReverbProfile, renderStereoImpulse } from './reverb-math.js';
 
 // ─── State ──────────────────────────────────────────────────────
-let reverbNode = null;
-let reverbSend = null;
+let reverbNodes = []; // every node created for this room — for teardown
+let erConv = null;
+let tailConv = null;
+let wetGain = null;  // wet return level (post-convolver)
+let erGain = null;   // early-reflection blend
+let leadSend = null; // word voices feed here
+let padSend = null;  // ambient pads feed here
+let fxSend = null;   // punctuation feeds here
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// ─── Internal graph helpers ──────────────────────────────────────
+function track(node) { reverbNodes.push(node); return node; }
+
+/** Builds the full reverb graph (send buses → early refs + diffuse tail → wet return). */
+function buildGraph(c, dests) {
+  leadSend = track(c.createGain());
+  padSend = track(c.createGain());
+  fxSend = track(c.createGain());
+
+  erConv = track(c.createConvolver());
+  tailConv = track(c.createConvolver());
+  erGain = track(c.createGain());
+  wetGain = track(c.createGain());
+
+  // each role bus fans into BOTH the early-reflection room and the tail room
+  [leadSend, padSend, fxSend].forEach(send => {
+    send.connect(erConv);
+    send.connect(tailConv);
+  });
+  // early reflections blend against the main tail, then the combined
+  // reverberant signal is the wet return → destinations
+  erConv.connect(erGain);
+  tailConv.connect(wetGain);
+  erGain.connect(wetGain);
+  // one wet return per destination (dests already includes c.destination
+  // at the call site — connecting it twice would double the wet level)
+  dests.forEach(d => wetGain.connect(d));
+}
+
+/** Renders a stereo buffer pair for a profile and assigns it to a convolver. */
+function setProfileIR(c, convolver, profile, seed) {
+  const [l, r] = renderStereoImpulse(c.sampleRate, profile, seed);
+  const buf = c.createBuffer(2, l.length, c.sampleRate);
+  buf.getChannelData(0).set(l);
+  buf.getChannelData(1).set(r);
+  convolver.buffer = buf;
+}
+
+/** Applies a profile: renders + assigns both IRs and sets all levels. */
+function applyProfile(c, profile, seed) {
+  // early-reflection IR shares the room's character but shorter/denser
+  const erProfile = {
+    ...profile,
+    impulseDuration: Math.max(0.18, profile.preDelay * 6),
+    damping: profile.damping + 0.15,
+  };
+  setProfileIR(c, erConv, erProfile, seed);
+  setProfileIR(c, tailConv, profile, seed + 0x1234567);
+
+  wetGain.gain.value = profile.wet;
+  erGain.gain.value = profile.erLevel;
+  leadSend.gain.value = profile.roleSend.lead;
+  padSend.gain.value = profile.roleSend.pad;
+  fxSend.gain.value = profile.roleSend.fx;
+}
 
 // ─── Public API ─────────────────────────────────────────────────
-export function getReverbNode() { return reverbNode; }
+// getReverbNode() is kept for voices.js backward compatibility — it now
+// returns the LEAD send bus (word voices), so existing voice code that
+// does `g.connect(rev)` routes through the per-role send unchanged.
+export function getReverbNode() { return leadSend; }
+export function getLeadSend() { return leadSend; }
+export function getPadSend() { return padSend; }
+export function getFxSend() { return fxSend; }
+
+/**
+ * Creates (or rebuilds) the reverb room for a perceptual state.
+ * Call on composition changes (start, paragraph/sentence shifts).
+ * @param {AudioNode[]} dests
+ * @param {Object} [state] { normScore, density, energy, role }
+ * @param {number} [seed]
+ */
+export function ensureReverb(dests, state = {}, seed = 0xCAFE) {
+  const c = ac();
+  resetReverb();
+  buildGraph(c, dests);
+  const profile = computeReverbProfile(state);
+  applyProfile(c, profile, seed);
+}
+
+/**
+ * Smoothly updates live parameters (wet, early reflections, role sends)
+ * without rebuilding impulse responses. Sized for per-word density/energy
+ * changes — short exp smoothing makes moves gradual, not clicks.
+ * @param {Object} state { normScore, density, energy }
+ */
+export function updateReverb(state = {}) {
+  if (!wetGain || !erGain) return;
+  const c = ac();
+  const profile = computeReverbProfile(state);
+  const t = c.currentTime;
+  const k = 0.05;
+  wetGain.gain.setTargetAtTime(profile.wet, t, k);
+  erGain.gain.setTargetAtTime(profile.erLevel, t, k);
+  leadSend.gain.setTargetAtTime(profile.roleSend.lead, t, k);
+  padSend.gain.setTargetAtTime(profile.roleSend.pad, t, k);
+  fxSend.gain.setTargetAtTime(profile.roleSend.fx, t, k);
+}
 
 export function resetReverb() {
-  reverbNode = null;
-  reverbSend = null;
-}
-
-// ─── Convolver builder ──────────────────────────────────────────
-/**
- * Builds a stereo convolution reverb from a synthetic impulse response.
- * The IR is random noise shaped by an exponential decay curve.
- * @param {AudioContext} c
- * @returns {ConvolverNode}
- */
-function buildReverb(c) {
-  const dur = 4.5,    // reverb tail length in seconds
-        decay = 2.2;  // exponential decay exponent (higher = faster falloff)
-  const len = Math.floor(c.sampleRate * dur);
-  const buf = c.createBuffer(2, len, c.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
-    const d = buf.getChannelData(ch);
-    for (let i = 0; i < len; i++)
-      d[i] = (rnd(0, 2) - 1) * Math.pow(1 - i / len, decay);
-  }
-  const conv = c.createConvolver();
-  conv.buffer = buf;
-  return conv;
-}
-
-// ─── Init ───────────────────────────────────────────────────────
-/**
- * Creates the reverb node once and connects it to all destinations.
- * Safe to call multiple times — only builds on first call.
- * @param {AudioNode[]} dests
- * @param {number} [wetness=0.38] — dry/wet send level (0 = dry, 1 = full wet)
- */
-export function ensureReverb(dests, wetness = 0.38) {
-  const c = ac();
-  if (!reverbNode) {
-    reverbNode = buildReverb(c);
-    reverbSend = c.createGain();
-    reverbSend.gain.value = wetness; // dry/wet mix (0 = dry, 1 = full wet)
-    reverbNode.connect(reverbSend);
-    dests.forEach(d => reverbSend.connect(d));
-  }
+  reverbNodes.forEach(n => {
+    try { n.disconnect(); } catch (e) {}
+  });
+  reverbNodes = [];
+  erConv = null;
+  tailConv = null;
+  wetGain = null;
+  erGain = null;
+  leadSend = null;
+  padSend = null;
+  fxSend = null;
 }

@@ -1,9 +1,9 @@
 import { ac } from './context.js';
-import { getReverbNode } from './reverb.js';
+import { getFxSend } from './reverb.js';
 
 export function playPunctuation(ch, dests, intensity) {
   const c = ac();
-  const rev = getReverbNode();
+  const rev = getFxSend();
 
   // Meaningful silence: '.' and ',' no longer strike a lead note. The pause
   // itself (already handled by the timing gap in player.js) IS the punctuation —
