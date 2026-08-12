@@ -1,6 +1,5 @@
 import { MODE_ORDER, buildScale } from './scales.js';
 import { detectMood } from './mood.js';
-import { MODE_OFFSETS } from './scales.js';
 
 // ─── State ──────────────────────────────────────────────────────
 export let currentScale = buildScale(110.00, 'minor');
@@ -73,16 +72,25 @@ export function wordNoteScale() {
 // ─── Chord construction ─────────────────────────────────────────
 /**
  * Builds a 4-note chord (root, 3rd, 5th, 7th) from a scale,
- * wrapping into the next octave when the degree exceeds the scale length.
+ * wrapping into higher octaves as the degree index exceeds the
+ * scale's length. Works for scales of any length (5-note pentatonics,
+ * 6-note whole-tone, 7-note modes, etc.) — the octave multiplier is
+ * 2^floor(degree / len), not a flat ×2, since a degree can wrap past
+ * the scale's end more than once on shorter scales (e.g. degree 6 on
+ * a 5-note scale wraps twice, not once).
  * @param {number[]} scale — scale frequencies
  * @param {number} degreeRoot — degree index (0-based)
  * @returns {number[]}
  */
 export function chordFromScale(scale, degreeRoot) {
   const len = scale.length;
-  const root    = scale[degreeRoot % len] * (degreeRoot >= len ? 2 : 1);
-  const third   = scale[(degreeRoot + 2) % len] * ((degreeRoot + 2) >= len ? 2 : 1);
-  const fifth   = scale[(degreeRoot + 4) % len] * ((degreeRoot + 4) >= len ? 2 : 1);
-  const seventh = scale[(degreeRoot + 6) % len] * ((degreeRoot + 6) >= len ? 2 : 1);
+  const noteAt = (degree) => {
+    const octaveMult = Math.pow(2, Math.floor(degree / len));
+    return scale[degree % len] * octaveMult;
+  };
+  const root    = noteAt(degreeRoot);
+  const third   = noteAt(degreeRoot + 2);
+  const fifth   = noteAt(degreeRoot + 4);
+  const seventh = noteAt(degreeRoot + 6);
   return [root, third, fifth, seventh];
 }

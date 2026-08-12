@@ -1,6 +1,6 @@
 import { editor, render, bPlay, bStop, bSave } from './dom.js';
 import { ac, unlockIOSAudio } from './audio/context.js';
-import { ensureReverb, resetReverb } from './audio/reverb.js';
+import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
@@ -48,8 +48,8 @@ const BRIGHT_VOICES = [1, 3, 5, 8, 9, 10, 11, 17, 18, 19]; // Pluck, Bell, Piano
 // than a phrase. Notably, this split already correlates strongly with
 // DARK/BRIGHT above (ramped ≈ dark/airy, percussive ≈ bright/lively),
 // so the two signals reinforce rather than fight each other.
-const PERCUSSIVE_VOICES = [1, 3, 7, 8, 9, 10, 11, 14, 17, 19, 20];
-const RAMPED_VOICES = [0, 2, 4, 5, 6, 12, 13, 15, 16, 18, 21];
+const PERCUSSIVE_VOICES = [1, 3, 5, 7, 8, 9, 10, 11, 14, 17, 19, 20];
+const RAMPED_VOICES = [0, 2, 4, 6, 12, 13, 15, 16, 18, 21];
 
 /**
  * Picks a voice from the sentenceType group, layering two signals:
@@ -133,8 +133,13 @@ export async function play() {
   // per-word — a much more standard way to convey melancholy/distance
   // than simply turning the volume down.
   const clampedNorm = Math.max(-1.5, Math.min(1.5, sessionNormScore));
-  const moodWetness = 0.55 - ((clampedNorm + 1.5) / 3.0) * 0.30;
-  ensureReverb(dests, moodWetness);
+  const startEnergy = Math.max(0, Math.min(1, (sessionTenseScore + 1) / 2));
+  const roomSeed = hashText(text) >>> 0;
+  ensureReverb(dests, {
+    normScore: clampedNorm,
+    density: 1,
+    energy: startEnergy,
+  }, roomSeed);
 
   // Recording is a nice-to-have, not essential — if MediaRecorder isn't
   // available or fails to construct (some browsers/embedded webviews),
@@ -207,6 +212,9 @@ export async function play() {
     // ambient density: thinner at paragraph start, thicker at end
     const density = tok.paraPos === 'start' ? 0.55 : tok.paraPos === 'end' ? 1.35 : 1;
     setAmbientDensity(density);
+    // reverb follows the same density: sparse passages sit further back in
+    // a huge room, dense ones pull the depth layers in so nothing smears.
+    updateReverb({ normScore: sessionNormScore, density, energy: startEnergy });
 
     // cadence: the last word right before sentence-ending punctuation
     // gets a softer, longer note — a natural "landing" instead of an

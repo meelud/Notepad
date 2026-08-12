@@ -1,5 +1,5 @@
 import { ac } from './context.js';
-import { getReverbNode } from './reverb.js';
+import { getPadSend } from './reverb.js';
 import { rnd, pick } from '../utils/rng.js';
 import { currentScale, chordFromScale } from '../music/harmony.js';
 
@@ -55,7 +55,7 @@ export function clearAmb() {
  */
 export function startAmbient(dests, isStopping) {
   const c = ac();
-  const rev = getReverbNode();
+  const rev = getPadSend();
   clockRunning = true;
   let beat = 0;
   let lastDegree = null;
