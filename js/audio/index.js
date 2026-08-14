@@ -5,7 +5,7 @@
  */
 export { ac } from './context.js';
 export { ensureReverb, updateReverb, resetReverb, getReverbNode, getLeadSend, getPadSend, getFxSend } from './reverb.js';
-export { computeReverbProfile, renderImpulseResponse } from './reverb-math.js';
+export { computeReverbProfile, renderImpulseResponse, registerModifier } from './reverb-math.js';
 export { VOICES } from './voices.js';
 export { startAmbient, clearAmb, setAmbientDensity } from './ambient.js';
 export { playPunctuation } from './punctuation.js';

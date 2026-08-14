@@ -1,5 +1,6 @@
 import { MODE_ORDER, buildScale } from './scales.js';
 import { detectMood } from './mood.js';
+import { rnd } from '../utils/rng.js';
 
 // ─── State ──────────────────────────────────────────────────────
 export let currentScale = buildScale(110.00, 'minor');
@@ -69,7 +70,56 @@ export function wordNoteScale() {
   return out;
 }
 
-// ─── Chord construction ─────────────────────────────────────────
+// ─── Melodic contour ──────────────────────────────────────────────
+/**
+ * Picks the next melody note as a step FROM the previous scale degree,
+ * instead of an independent random pick — this is what gives the line
+ * an actual contour instead of a random walk. Degree and octave are
+ * tracked separately (not as one flattened array index) so a "step"
+ * is always a real scale step, never an accidental octave jump.
+ *
+ * @param {{degree:number, octave:number}|null} prev — null starts a
+ *   new phrase (lands near the root, mid octave).
+ * @param {boolean} isCadence — true for a sentence's last word: pulls
+ *   motion stepwise back toward the root degree (a real resolution).
+ * @param {number} tenseScore — wider leaps when text reads more tense.
+ * @returns {{freq:number, degree:number, octave:number}}
+ */
+export function nextMelodyNote(prev, isCadence, tenseScore = 0) {
+  const len = currentScale.length;
+  const modeIdx = MODE_ORDER.indexOf(currentMood);
+  const octRange = modeIdx <= 4 ? [0.5, 1, 2] : modeIdx <= 8 ? [0.5, 1, 2, 3]
+                  : modeIdx <= 12 ? [1, 2, 3, 4] : [1, 2, 3, 4, 6];
+
+  if (!prev) {
+    return { degree: 0, octave: octRange[Math.floor(octRange.length / 2)], freq: currentScale[0] * octRange[Math.floor(octRange.length / 2)] };
+  }
+
+  let degree = prev.degree;
+  let octave = prev.octave;
+
+  if (isCadence) {
+    // resolve stepwise toward the root degree (0) — a real cadence,
+    // not a random landing
+    degree += degree > 0 ? -1 : (degree < 0 ? 1 : 0);
+  } else {
+    // mostly stepwise motion (±1), occasional leap (±2..3) scaled by
+    // tension — tense text leaps more, calm text stays closer together
+    const leapChance = 0.15 + Math.max(0, Math.min(1, tenseScore)) * 0.25;
+    const isLeap = rnd(0, 1) < leapChance;
+    const stepSize = isLeap ? (1 + Math.floor(rnd(0, 2))) + 1 : 1;
+    degree += rnd(0, 1) < 0.5 ? -stepSize : stepSize;
+  }
+
+  // wrap degree into an octave shift rather than clamping — keeps the
+  // contour continuous instead of hitting a hard ceiling/floor
+  while (degree >= len) { degree -= len; octave = octRange[Math.min(octRange.length - 1, octRange.indexOf(octave) + 1)]; }
+  while (degree < 0)    { degree += len; octave = octRange[Math.max(0, octRange.indexOf(octave) - 1)]; }
+
+  return { degree, octave, freq: currentScale[degree] * octave };
+}
+
+
 /**
  * Builds a 4-note chord (root, 3rd, 5th, 7th) from a scale,
  * wrapping into higher octaves as the degree index exceeds the

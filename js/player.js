@@ -4,7 +4,7 @@ import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, wordNoteScale, currentScale } from './music/harmony.js';
+import { deriveTextHarmony, hashText, nextMelodyNote } from './music/harmony.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast } from './persona.js';
@@ -186,10 +186,12 @@ export async function play() {
 
   let currentFamily = familyForMood(sessionNormScore);
   let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily);
+  let lastNote = null; // melodic contour state: {degree, octave} — reset per sentence
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
     const tok = playable[i];
+    try {
 
     render.innerHTML = buildRender(text, tok.start, tok.end);
 
@@ -212,6 +214,9 @@ export async function play() {
     // ambient density: thinner at paragraph start, thicker at end
     const density = tok.paraPos === 'start' ? 0.55 : tok.paraPos === 'end' ? 1.35 : 1;
     setAmbientDensity(density);
+    // reverb follows the same density: sparse passages sit further back in
+    // a huge room, dense ones pull the depth layers in so nothing smears.
+    updateReverb({ normScore: sessionNormScore, density, energy: startEnergy });
 
     // cadence: the last word right before sentence-ending punctuation
     // gets a softer, longer note — a natural "landing" instead of an
@@ -219,16 +224,20 @@ export async function play() {
     const next = playable[i + 1];
     const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
 
-    const freq = pick(wordNoteScale());
+    // sentence position (must be computed before the melody contour
+    // block below, which reads sp.pos to detect a new sentence)
+    const sp = sentencePos[i] || { pos: 1, total: 1 };
 
-    // reverb follows density + register: sparse passages sit further back,
-    // bass notes excite more room modes, treble stays present.
-    updateReverb({ normScore: sessionNormScore, density, energy: startEnergy, frequency: freq });
+    const freq = (() => {
+      if (sp.pos === 1) lastNote = null; // new sentence: start a fresh phrase
+      const note = nextMelodyNote(lastNote, isCadence, sessionTenseScore);
+      lastNote = note;
+      return note.freq;
+    })();
 
     // gentle volume arc across the sentence: quieter near the edges,
     // fuller in the middle — real phrasing breathes, it doesn't hold
     // one flat loudness word to word. Sin-shaped, ±15%, clamped.
-    const sp = sentencePos[i] || { pos: 1, total: 1 };
     const frac = sp.total > 1 ? (sp.pos - 1) / (sp.total - 1) : 0.5;
     const volArc = 0.85 + Math.sin(Math.PI * frac) * 0.3;
 
@@ -275,6 +284,14 @@ export async function play() {
     const base = (380 + wlen * 42) * pacingFactor;
     const spd  = (isCadence ? base * 1.2 : base) + rnd(-20, 60);
     await sleep(spd);
+    } catch (err) {
+      // A failure synthesizing/scheduling this one word must not kill the
+      // whole loop — previously an uncaught error here silently stopped
+      // playback after the first word while startAmbient()'s independent
+      // setTimeout clock kept running forever with no cleanup (clearAmb()
+      // is only called after the loop finishes normally or via stop()).
+      console.error('Notepad: error playing word, skipping to next', tok?.text, err);
+    }
   }
 
   const completedNaturally = !stopping;
