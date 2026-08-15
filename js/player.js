@@ -4,7 +4,7 @@ import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, nextMelodyNote } from './music/harmony.js';
+import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote } from './music/harmony.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast } from './persona.js';
@@ -18,6 +18,7 @@ let audioBlob = null;
 let harmonyLocked = false;
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
+let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
@@ -98,6 +99,7 @@ export async function play() {
     const harmonyInfo = deriveTextHarmony(text);
     sessionTenseScore = harmonyInfo.tenseScore;
     sessionNormScore = harmonyInfo.normScore;
+    pieceMotif = generateMotif(hashText(text), sessionTenseScore);
     harmonyLocked = true;
   }
 
@@ -186,7 +188,11 @@ export async function play() {
 
   let currentFamily = familyForMood(sessionNormScore);
   let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily);
-  let lastNote = null; // melodic contour state: {degree, octave} — reset per sentence
+  let lastNote = null; // melodic contour state: {degree, octave, lastInterval} — persists across sentences for register continuity
+  let sentenceCycle = 0;       // 1-based count of sentences seen so far
+  let wordIdxInSentence = 0;   // 0-based position of the current word within its sentence
+  let sentenceUsesMotif = false;
+  let sentenceStartDegree = 0;
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -228,10 +234,31 @@ export async function play() {
     // block below, which reads sp.pos to detect a new sentence)
     const sp = sentencePos[i] || { pos: 1, total: 1 };
 
+    if (sp.pos === 1) {
+      // new sentence: decide whether it restates the piece's motif
+      // (odd-numbered sentences: 1st, 3rd, 5th...) as a rising sequence,
+      // or moves freely (even-numbered) — periodic recurrence rather
+      // than either constant repetition or pure randomness every time
+      sentenceCycle++;
+      wordIdxInSentence = 0;
+      sentenceUsesMotif = (sentenceCycle % 2 === 1);
+      if (sentenceUsesMotif) {
+        const occurrenceIdx = Math.floor((sentenceCycle - 1) / 2);
+        sentenceStartDegree = motifSequenceStartDegree(occurrenceIdx);
+      }
+    }
+
     const freq = (() => {
-      if (sp.pos === 1) lastNote = null; // new sentence: start a fresh phrase
-      const note = nextMelodyNote(lastNote, isCadence, sessionTenseScore);
+      let note;
+      if (isCadence) {
+        note = resolveCadence(lastNote, tok.sentenceType);
+      } else if (sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
+        note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
+      } else {
+        note = stepwiseNote(lastNote, sessionTenseScore);
+      }
       lastNote = note;
+      wordIdxInSentence++;
       return note.freq;
     })();
 
