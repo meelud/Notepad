@@ -40,10 +40,19 @@ function pickNextDegree(prevDegree) {
 // ─── Public API ─────────────────────────────────────────────────
 export function setAmbientDensity(v) { ambientDensity = v; }
 
+// Live harmonic context: the scale-degree root of whichever chord is
+// currently sounding in the ambient bed. Updated once per bar (every
+// time tick() picks a new chord), read by player.js so melody notes
+// can be chord-aware instead of blind to what's harmonizing underneath
+// them. null before the first chord of a session has been chosen.
+let currentChordRootDegree = null;
+export function getCurrentChordDegree() { return currentChordRootDegree; }
+
 export function clearAmb() {
   ambTimers.forEach(id => clearTimeout(id));
   ambTimers = [];
   clockRunning = false;
+  currentChordRootDegree = null;
 }
 
 // ─── Ambient clock ──────────────────────────────────────────────
@@ -131,6 +140,7 @@ export function startAmbient(dests, isStopping) {
     if (beatInBar === 0) {
       let degree = pickNextDegree(lastDegree);
       lastDegree = degree;
+      currentChordRootDegree = degree;
       playChord(chordFromScale(currentScale, degree), barDur * 1.15);
       playTapeWarmth(barDur * 1.1);
     }

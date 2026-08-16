@@ -3,8 +3,8 @@ import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
-import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote } from './music/harmony.js';
+import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree } from './audio/ambient.js';
+import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote, harmonizeNote } from './music/harmony.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast } from './persona.js';
@@ -255,7 +255,16 @@ export async function play() {
       } else if (sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
         note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
       } else {
-        note = stepwiseNote(lastNote, sessionTenseScore);
+        // Harmonic awareness: on odd word positions within the sentence
+        // (a simple downbeat proxy — true beat-grid sync is a separate,
+        // higher-risk item on the roadmap), pull the note onto the
+        // nearest tone of whatever chord ambient.js is currently
+        // sounding, so it doesn't land on an arbitrary scale degree
+        // that clashes with the live harmony. Even word positions stay
+        // free passing-tone motion, exactly as before.
+        const isStrongBeat = sp.pos % 2 === 1;
+        const chordDeg = isStrongBeat ? getCurrentChordDegree() : null;
+        note = (chordDeg !== null && harmonizeNote(lastNote, chordDeg)) || stepwiseNote(lastNote, sessionTenseScore);
       }
       lastNote = note;
       wordIdxInSentence++;

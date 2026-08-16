@@ -260,6 +260,39 @@ export function motifNote(motif, startDegree, wordIdx, prev) {
 
 
 /**
+ * Harmonic awareness: places the note on the nearest tone of the
+ * chord currently sounding in ambient.js (root/3rd/5th/7th, built the
+ * same way chordFromScale builds the audible chord — degrees rootDeg,
+ * rootDeg+2, rootDeg+4, rootDeg+6), using the same nearest-tone voice
+ * leading as placeNearest. Tries all four chord tones and keeps
+ * whichever is the smallest leap from prev — this is what keeps a
+ * "strong beat" note consonant with the harmony instead of landing on
+ * an arbitrary scale degree that may clash with the chord underneath.
+ * Returns null if there's no live chord to harmonize against yet (the
+ * caller should fall back to plain stepwiseNote in that case).
+ * @param {{degree:number, octave:number}|null} prev
+ * @param {number|null} chordRootDegree — from ambient.js's getCurrentChordDegree()
+ */
+export function harmonizeNote(prev, chordRootDegree) {
+  if (chordRootDegree === null || chordRootDegree === undefined) return null;
+  const len = currentScale.length;
+  const tones = [...new Set(
+    [chordRootDegree, chordRootDegree + 2, chordRootDegree + 4, chordRootDegree + 6]
+      .map(d => ((d % len) + len) % len)
+  )];
+  if (!prev) return placeNearest(tones[0], null);
+  const prevFreq = currentScale[prev.degree] * prev.octave;
+  let best = null, bestDist = Infinity;
+  tones.forEach(t => {
+    const candidate = placeNearest(t, prev);
+    const dist = Math.abs(Math.log2(candidate.freq / prevFreq));
+    if (dist < bestDist) { bestDist = dist; best = candidate; }
+  });
+  return best;
+}
+
+
+/**
  * Builds a 4-note chord (root, 3rd, 5th, 7th) from a scale,
  * wrapping into higher octaves as the degree index exceeds the
  * scale's length. Works for scales of any length (5-note pentatonics,
