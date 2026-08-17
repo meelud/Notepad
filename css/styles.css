@@ -286,30 +286,30 @@ html.light {
   --dimtxt: #9a9a96;
   --accent: #5b6b78;
   --hl: #000000;
-  --metal-hi: #f6f6f4;
-  --metal-mid: #c9c9c5;
-  --metal-lo: #8d8d89;
+  --metal-hi: #eef4f7;
+  --metal-mid: #c1ccd3;
+  --metal-lo: #869199;
   --brass: #57585c;
-  --brass-dim: #a8a8a4;
+  --brass-dim: #a3aeb4;
   --word-glow: rgba(0,0,0,0.14);
 }
 
 html.light #bar {
-  border-color: #b9b9b5;
+  border-color: #a9b4ba;
   box-shadow:
-    0 1px 0 rgba(255,255,255,0.85) inset,
-    0 -6px 10px rgba(0,0,0,0.12) inset,
-    0 10px 22px rgba(0,0,0,0.14),
-    0 1px 0 rgba(0,0,0,0.08);
+    0 1px 0 rgba(255,255,255,0.9) inset,
+    0 -6px 10px rgba(80,100,112,0.12) inset,
+    0 10px 22px rgba(60,80,92,0.14),
+    0 1px 0 rgba(60,80,92,0.08);
 }
 
 html.light #bar::before {
   background: repeating-linear-gradient(
     180deg,
-    rgba(255,255,255,0.5) 0px,
-    rgba(255,255,255,0.5) 1px,
-    rgba(0,0,0,0.03) 1px,
-    rgba(0,0,0,0.03) 2px
+    rgba(255,255,255,0.22) 0px,
+    rgba(255,255,255,0.22) 4px,
+    rgba(140,160,172,0.05) 4px,
+    rgba(140,160,172,0.05) 8px
   );
 }
 
