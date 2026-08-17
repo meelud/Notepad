@@ -199,6 +199,7 @@ body {
   width: 26px;
   opacity: 0.32;
   filter: grayscale(0.15);
+  mix-blend-mode: screen;
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
   pointer-events: none;
   user-select: none;
