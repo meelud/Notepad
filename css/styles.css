@@ -199,7 +199,6 @@ body {
   width: 26px;
   opacity: 0.32;
   filter: grayscale(0.15);
-  mix-blend-mode: screen;
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
   pointer-events: none;
   user-select: none;
@@ -209,6 +208,13 @@ body:hover #mark, #mark:hover {
   opacity: 0.85;
   filter: grayscale(0);
   transform: translateY(-2px);
+}
+
+html.light #mark {
+  opacity: 0.5;
+}
+html.light body:hover #mark, html.light #mark:hover {
+  opacity: 0.95;
 }
 
 /* ─── Feedback label ──────────────────────────────────────── */
