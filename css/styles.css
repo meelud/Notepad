@@ -196,7 +196,7 @@ body {
 #mark {
   position: fixed;
   bottom: 22px; left: 24px;
-  width: 26px;
+  width: 19px;
   opacity: 0.32;
   filter: grayscale(0.15);
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;

@@ -48,11 +48,17 @@ export function setAmbientDensity(v) { ambientDensity = v; }
 let currentChordRootDegree = null;
 export function getCurrentChordDegree() { return currentChordRootDegree; }
 
+// Direction the chord root just moved (-1 down, 0 none/first chord, +1
+// up), for contrary-motion melody bias — see harmonizeNote's caller.
+let currentChordDirection = 0;
+export function getChordDirection() { return currentChordDirection; }
+
 export function clearAmb() {
   ambTimers.forEach(id => clearTimeout(id));
   ambTimers = [];
   clockRunning = false;
   currentChordRootDegree = null;
+  currentChordDirection = 0;
 }
 
 // ─── Ambient clock ──────────────────────────────────────────────
@@ -138,7 +144,9 @@ export function startAmbient(dests, isStopping) {
     const barDur = BEAT_SEC * BAR_BEATS;
 
     if (beatInBar === 0) {
+      const prevDegree = lastDegree;
       let degree = pickNextDegree(lastDegree);
+      currentChordDirection = prevDegree === null ? 0 : Math.sign(degree - prevDegree);
       lastDegree = degree;
       currentChordRootDegree = degree;
       playChord(chordFromScale(currentScale, degree), barDur * 1.15);

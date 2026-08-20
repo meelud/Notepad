@@ -187,6 +187,36 @@ export function stepwiseNote(prev, tenseScore = 0) {
   return { degree, octave, freq: currentScale[degree] * octave, lastInterval: interval };
 }
 
+/**
+ * Global tension profile (Herremans & Chew, "MorpheuS: generating
+ * structured music with constrained patterns and tension", 2017): a
+ * long-term arc shaping leap-likelihood across the WHOLE piece, not
+ * just within each sentence — the standard fix for algorithmic melody
+ * generation that sounds locally coherent but has no large-scale
+ * direction. Returns a 0..amplitude bias to ADD to a local tenseScore;
+ * it never replaces it, so sentence-level character is preserved and
+ * this simply leans the whole piece toward its climax.
+ *
+ * Uses a two-sided smoothstep envelope (not a symmetric sine) so the
+ * peak sits at `peak` exactly and both slopes are C1-continuous —
+ * peak defaults to 0.68 (68% through the piece), matching the classic
+ * narrative-arc convention of climax arriving around 60-75% through a
+ * piece's total duration rather than dead-center.
+ * @param {number} progress — the current word's position in the WHOLE
+ *   text, 0 (first word) to 1 (last word).
+ * @param {number} [amplitude=0.4] — max bias added at the peak.
+ * @param {number} [peak=0.68] — where in [0,1] the arc climaxes.
+ * @returns {number} 0..amplitude
+ */
+export function globalTensionBias(progress, amplitude = 0.4, peak = 0.68) {
+  const x = Math.max(0, Math.min(1, progress));
+  const smoothstep = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+  const shape = x <= peak
+    ? smoothstep(peak === 0 ? 1 : x / peak)
+    : smoothstep(peak === 1 ? 1 : (1 - x) / (1 - peak));
+  return shape * amplitude;
+}
+
 // ─── Motif ──────────────────────────────────────────────────────
 // Local, isolated seeded RNG for motif generation only — mirrors the
 // pattern in audio/reverb-math.js (mulberry32). Motif generation must
@@ -270,10 +300,22 @@ export function motifNote(motif, startDegree, wordIdx, prev) {
  * an arbitrary scale degree that may clash with the chord underneath.
  * Returns null if there's no live chord to harmonize against yet (the
  * caller should fall back to plain stepwiseNote in that case).
+ *
+ * Optional contrary-motion bias (first-species counterpoint's leading
+ * principle — Fux, "Gradus ad Parnassum", 1725; Aldwell & Schachter):
+ * when `chordDirection` shows the chord itself just moved up or down,
+ * this probabilistically (not absolutely) prefers whichever chord-tone
+ * candidate moves the melody the OPPOSITE way — this is what keeps a
+ * melody line independent from its accompaniment instead of doubling
+ * its motion. It's a lean among the already-computed candidates, not a
+ * replacement for nearest-tone voice leading: if no contrary-moving
+ * candidate exists (or chordDirection is 0/omitted), behavior is
+ * identical to before this parameter existed.
  * @param {{degree:number, octave:number}|null} prev
  * @param {number|null} chordRootDegree — from ambient.js's getCurrentChordDegree()
+ * @param {number} [chordDirection=0] — from ambient.js's getChordDirection(): -1, 0, or 1
  */
-export function harmonizeNote(prev, chordRootDegree) {
+export function harmonizeNote(prev, chordRootDegree, chordDirection = 0) {
   if (chordRootDegree === null || chordRootDegree === undefined) return null;
   const len = currentScale.length;
   const tones = [...new Set(
@@ -282,12 +324,31 @@ export function harmonizeNote(prev, chordRootDegree) {
   )];
   if (!prev) return placeNearest(tones[0], null);
   const prevFreq = currentScale[prev.degree] * prev.octave;
-  let best = null, bestDist = Infinity;
-  tones.forEach(t => {
+  const candidates = tones.map(t => {
     const candidate = placeNearest(t, prev);
     const dist = Math.abs(Math.log2(candidate.freq / prevFreq));
-    if (dist < bestDist) { bestDist = dist; best = candidate; }
+    return { candidate, dist };
   });
+  candidates.sort((a, b) => a.dist - b.dist);
+  // Anti-stall guard: if the nearest candidate is a unison (dist===0)
+  // and a non-unison alternative exists, skip the unison most of the
+  // time — otherwise, once the melody lands on a degree that happens
+  // to be a common tone of every chord (mathematically guaranteed here
+  // for degree 6 across all four CHORD_DEGREES on a 7-note scale), it
+  // stays there permanently since zero distance always wins.
+  let pool = candidates;
+  if (candidates[0].dist === 0 && candidates.length > 1 && rnd(0, 1) < 0.8) {
+    pool = candidates.slice(1);
+  }
+  const best = pool[0].candidate;
+
+  if (chordDirection === 0) return best; // unchanged behavior when direction is unknown/flat
+
+  const CONTRARY_BIAS = 0.65; // probabilistic, not absolute — see docstring
+  const contrary = pool.filter(c =>
+    c.candidate.degree === prev.degree || Math.sign(c.candidate.degree - prev.degree) === -chordDirection
+  );
+  if (contrary.length > 0 && rnd(0, 1) < CONTRARY_BIAS) return contrary[0].candidate;
   return best;
 }
 

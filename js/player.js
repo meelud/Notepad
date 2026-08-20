@@ -3,8 +3,8 @@ import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
-import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote, harmonizeNote } from './music/harmony.js';
+import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getChordDirection } from './audio/ambient.js';
+import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote, harmonizeNote, globalTensionBias } from './music/harmony.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast } from './persona.js';
@@ -19,6 +19,13 @@ let harmonyLocked = false;
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
+
+// Item #3 (global tension profile) toggle — flip to false to instantly
+// revert to pure per-sentence tenseScore for A/B comparison.
+const GLOBAL_TENSION_ENABLED = true;
+// Item #2 (contrary motion vs chord movement) toggle — flip to false to
+// revert harmonizeNote calls to plain nearest-tone voice leading only.
+const CONTRARY_MOTION_ENABLED = true;
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
@@ -163,6 +170,7 @@ export async function play() {
 
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
+  const totalWordsInText = playable.filter(t => t.type === 'word').length;
 
   // sentence-position map: for each word token's index in `playable`,
   // record its 1-based position and the total word count of its
@@ -193,6 +201,7 @@ export async function play() {
   let wordIdxInSentence = 0;   // 0-based position of the current word within its sentence
   let sentenceUsesMotif = false;
   let sentenceStartDegree = 0;
+  let wordGlobalIndex = 0; // 0-based position of this word across the WHOLE text (for global tension arc)
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -264,10 +273,15 @@ export async function play() {
         // free passing-tone motion, exactly as before.
         const isStrongBeat = sp.pos % 2 === 1;
         const chordDeg = isStrongBeat ? getCurrentChordDegree() : null;
-        note = (chordDeg !== null && harmonizeNote(lastNote, chordDeg)) || stepwiseNote(lastNote, sessionTenseScore);
+        const progress = totalWordsInText > 1 ? wordGlobalIndex / (totalWordsInText - 1) : 0;
+        const effectiveTense = GLOBAL_TENSION_ENABLED
+          ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress)))
+          : sessionTenseScore;
+        note = (chordDeg !== null && harmonizeNote(lastNote, chordDeg, CONTRARY_MOTION_ENABLED ? getChordDirection() : 0)) || stepwiseNote(lastNote, effectiveTense);
       }
       lastNote = note;
       wordIdxInSentence++;
+      wordGlobalIndex++;
       return note.freq;
     })();
 
