@@ -5,6 +5,8 @@ import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getChordDirection } from './audio/ambient.js';
 import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote, harmonizeNote, globalTensionBias } from './music/harmony.js';
+import { wordEmotionWeight } from './music/mood.js';
+import { deriveIntentions } from './music/intention.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast } from './persona.js';
@@ -16,9 +18,15 @@ let rec = null;
 let chunks = [];
 let audioBlob = null;
 let harmonyLocked = false;
+let lastHarmonyText = null; // the text harmonyLocked was derived from — auto-invalidates the lock if the text changes
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
+let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
+// Musical Intention layer toggle — flip to false to ignore clause-level
+// semantics (contrast/contour) entirely, reverting to prior behavior.
+const MUSICAL_INTENTION_ENABLED = true;
+const REGISTER_BIAS_ENABLED = true;
 
 // Item #3 (global tension profile) toggle — flip to false to instantly
 // revert to pure per-sentence tenseScore for A/B comparison.
@@ -26,6 +34,10 @@ const GLOBAL_TENSION_ENABLED = true;
 // Item #2 (contrary motion vs chord movement) toggle — flip to false to
 // revert harmonizeNote calls to plain nearest-tone voice leading only.
 const CONTRARY_MOTION_ENABLED = true;
+// Item #1 (GTTM-style structural weighting) toggle — flip to false to
+// revert to strong-beat-only harmonization, ignoring word semantics.
+const SEMANTIC_STABILITY_ENABLED = true;
+const SEMANTIC_WEIGHT_THRESHOLD = 0.5; // lexicon match strength that earns chord-tone pull on an otherwise-free (weak) beat
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
@@ -102,12 +114,25 @@ export async function play() {
 
   unlockIOSAudio();
 
+  // A locked harmony is only valid for the text it was derived from —
+  // if the editor's content has changed since then (typed new text and
+  // hit Play without clicking Clear), the lock must NOT carry over, or
+  // every subsequent piece silently reuses the first text's mode/
+  // scale/motif/intentions regardless of what the new text actually
+  // says. Clear() still works as an explicit reset; this just makes
+  // editing-then-replaying also behave correctly without relying on it.
+  if (harmonyLocked && text !== lastHarmonyText) {
+    harmonyLocked = false;
+  }
+
   if (!harmonyLocked) {
     const harmonyInfo = deriveTextHarmony(text);
     sessionTenseScore = harmonyInfo.tenseScore;
     sessionNormScore = harmonyInfo.normScore;
     pieceMotif = generateMotif(hashText(text), sessionTenseScore);
+    pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
     harmonyLocked = true;
+    lastHarmonyText = text;
   }
 
   seedRng(hashText(text));
@@ -202,6 +227,8 @@ export async function play() {
   let sentenceUsesMotif = false;
   let sentenceStartDegree = 0;
   let wordGlobalIndex = 0; // 0-based position of this word across the WHOLE text (for global tension arc)
+  let clauseCursor = 0;
+  let wordIdxInClause = 0;
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -257,10 +284,21 @@ export async function play() {
       }
     }
 
+    // advance the clause cursor so it always points at the clause
+    // containing this word (both arrays are in text order, so a simple
+    // forward-only pointer is enough — no need to search from scratch)
+    while (clauseCursor < pieceIntentions.length - 1 && tok.start >= pieceIntentions[clauseCursor].end) {
+      clauseCursor++;
+      wordIdxInClause = 0;
+    }
+    const intention = pieceIntentions[clauseCursor] || { contourBias: 0, isDisruption: false, cadenceStrength: 1 };
+    const isFirstWordOfClause = wordIdxInClause === 0;
+    wordIdxInClause++;
+
     const freq = (() => {
       let note;
       if (isCadence) {
-        note = resolveCadence(lastNote, tok.sentenceType);
+        note = resolveCadence(lastNote, tok.sentenceType, intention.cadenceStrength, REGISTER_BIAS_ENABLED ? intention.contourBias : 0);
       } else if (sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
         note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
       } else {
@@ -272,12 +310,15 @@ export async function play() {
         // that clashes with the live harmony. Even word positions stay
         // free passing-tone motion, exactly as before.
         const isStrongBeat = sp.pos % 2 === 1;
-        const chordDeg = isStrongBeat ? getCurrentChordDegree() : null;
+        const semanticWeight = SEMANTIC_STABILITY_ENABLED ? wordEmotionWeight(tok.text) : 0;
+        const isSemanticallyStable = semanticWeight >= SEMANTIC_WEIGHT_THRESHOLD;
+        const chordDeg = (isStrongBeat || isSemanticallyStable) ? getCurrentChordDegree() : null;
         const progress = totalWordsInText > 1 ? wordGlobalIndex / (totalWordsInText - 1) : 0;
         const effectiveTense = GLOBAL_TENSION_ENABLED
           ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress)))
           : sessionTenseScore;
-        note = (chordDeg !== null && harmonizeNote(lastNote, chordDeg, CONTRARY_MOTION_ENABLED ? getChordDirection() : 0)) || stepwiseNote(lastNote, effectiveTense);
+        note = (chordDeg !== null && harmonizeNote(lastNote, chordDeg, CONTRARY_MOTION_ENABLED ? getChordDirection() : 0, REGISTER_BIAS_ENABLED ? intention.contourBias : 0))
+          || stepwiseNote(lastNote, effectiveTense, intention.contourBias, intention.isDisruption && isFirstWordOfClause);
       }
       lastNote = note;
       wordIdxInSentence++;
@@ -379,6 +420,7 @@ export function stop() {
 // ─── Reset helpers ──────────────────────────────────────────────
 export function resetHarmony() {
   harmonyLocked = false;
+  lastHarmonyText = null;
   sessionTenseScore = 0;
   sessionNormScore = 0;
 }

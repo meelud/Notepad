@@ -88,7 +88,28 @@ function octaveRangeForCurrentMood() {
  * @param {number} targetDegree
  * @param {{degree:number, octave:number}|null} prev
  */
-function placeNearest(targetDegree, prev) {
+/**
+ * Nearest-tone voice leading: places `targetDegree` in whichever
+ * octave (from the current mood's octave range) is closest in pitch
+ * to `prev` — the standard voice-leading economy principle (smallest
+ * possible melodic leap when resolving to a specific scale degree).
+ *
+ * Optional `registerBias` (-1..1, from a clause's Musical Intention —
+ * see music/intention.js's contourBias): a soft lean toward a HIGHER
+ * octave candidate (positive bias) or LOWER (negative), applied only
+ * as a small penalty/bonus on top of the real distance metric — so it
+ * can tip a close call, not force a large leap. This is intentionally
+ * scoped to placeNearest's callers (resolveCadence, harmonizeNote,
+ * motifNote — the melody's structural "anchor" points) rather than
+ * every free passing-tone note, so a clause's emotional intensity can
+ * audibly lift/lower the melody's register at its landing points
+ * without making the whole line jumpy. registerBias=0 (default)
+ * reproduces the exact prior nearest-octave selection.
+ * @param {number} targetDegree
+ * @param {{degree:number, octave:number}|null} prev
+ * @param {number} [registerBias=0]
+ */
+function placeNearest(targetDegree, prev, registerBias = 0) {
   const len = currentScale.length;
   const octRange = octaveRangeForCurrentMood();
   const baseDegree = ((targetDegree % len) + len) % len;
@@ -97,11 +118,17 @@ function placeNearest(targetDegree, prev) {
     return { degree: baseDegree, octave: oct, freq: currentScale[baseDegree] * oct, lastInterval: 0 };
   }
   const prevFreq = currentScale[prev.degree] * prev.octave;
-  let bestOct = octRange[0], bestDist = Infinity;
-  octRange.forEach(oct => {
+  const bias = Math.max(-1, Math.min(1, registerBias));
+  let bestOct = octRange[0], bestScore = Infinity;
+  octRange.forEach((oct, idx) => {
     const f = currentScale[baseDegree] * oct;
     const dist = Math.abs(Math.log2(f / prevFreq));
-    if (dist < bestDist) { bestDist = dist; bestOct = oct; }
+    // higher-index octaves get a small bonus when bias>0 (and vice
+    // versa) — scaled by octRange position so it only ever tips a
+    // genuinely close call, never overrides a clearly-nearer octave
+    const normIdx = octRange.length > 1 ? idx / (octRange.length - 1) : 0.5;
+    const score = dist - bias * (normIdx - 0.5) * 0.6;
+    if (score < bestScore) { bestScore = score; bestOct = oct; }
   });
   return {
     degree: baseDegree, octave: bestOct, freq: currentScale[baseDegree] * bestOct,
@@ -132,12 +159,28 @@ function dominantDegreeIndex() {
  * cadence — the harmonic equivalent of "left hanging", matching a
  * question's open-ended feel); statement/exclaim resolve to the tonic
  * (an authentic cadence — full close).
+ *
+ * Optional `strength` (from music/intention.js's cadenceStrength):
+ * when a clause's meaning doesn't cleanly resolve (e.g. an ambiguous
+ * or contradictory ending), forcing a full harmonic resolution would
+ * be dishonest to the text — so at low strength, resolution is
+ * probabilistically skipped in favor of ordinary stepwise motion,
+ * leaving the phrase genuinely "unresolved" (an unstable cadence).
+ * strength=1 (default) always resolves — identical to prior behavior.
+ *
+ * Optional `registerBias` (from intention.js's contourBias): see
+ * placeNearest — a soft octave lean at this cadence landing point.
  * @param {{degree:number, octave:number}|null} prev
  * @param {string} sentenceType
+ * @param {number} [strength=1] — 0..1, probability of a full resolution
+ * @param {number} [registerBias=0] — -1..1, soft octave lean
  */
-export function resolveCadence(prev, sentenceType) {
+export function resolveCadence(prev, sentenceType, strength = 1, registerBias = 0) {
+  if (strength < 1 && rnd(0, 1) > Math.max(0, Math.min(1, strength))) {
+    return stepwiseNote(prev, 0.3);
+  }
   const target = sentenceType === 'question' ? dominantDegreeIndex() : 0;
-  return placeNearest(target, prev);
+  return placeNearest(target, prev, registerBias);
 }
 
 /**
@@ -151,10 +194,23 @@ export function resolveCadence(prev, sentenceType) {
  * at least partially filled by stepwise motion back into it. Without
  * this, a contour built purely from independent random steps/leaps
  * reads as aimless rather than shaped.
+ *
+ * Optional semantic layer (clause-level Musical Intention — see
+ * music/intention.js): `directionBias` skews the up/down coin flip
+ * toward a clause's local sentiment trajectory (e.g. an improving
+ * clause leans the melody upward); `forceLeap` guarantees a leap on
+ * this note specifically, for a semantic "disruption" event (a
+ * contrast word like "but"/"ولی" triggering audible phrase
+ * disruption). Both are probabilistic/optional — 0 bias or
+ * forceLeap=false reproduce the exact prior behavior, and neither
+ * touches the gap-fill branch above, which stays authoritative right
+ * after a real leap regardless of semantic bias.
  * @param {{degree:number, octave:number, lastInterval?:number}|null} prev
  * @param {number} tenseScore
+ * @param {number} [directionBias=0] — -1..1, skews step direction
+ * @param {boolean} [forceLeap=false] — force this note to be a leap
  */
-export function stepwiseNote(prev, tenseScore = 0) {
+export function stepwiseNote(prev, tenseScore = 0, directionBias = 0, forceLeap = false) {
   const len = currentScale.length;
   const octRange = octaveRangeForCurrentMood();
 
@@ -165,19 +221,21 @@ export function stepwiseNote(prev, tenseScore = 0) {
 
   let degree = prev.degree, octave = prev.octave;
   const prevWasLeap = Math.abs(prev.lastInterval || 0) >= 2;
+  const bias = Math.max(-1, Math.min(1, directionBias));
+  const upProb = 0.5 + bias * 0.35; // capped skew (15%..85%) — never fully deterministic
 
   let interval;
   if (prevWasLeap) {
-    // gap-fill: step back in the opposite direction most of the time,
-    // occasionally break the rule (30%) so it doesn't read mechanically
+    // gap-fill takes priority over semantic bias — an actual leap's
+    // psychoacoustic pull back is stronger than a clause-level lean
     const recover = rnd(0, 1) >= 0.3;
     const dir = prev.lastInterval > 0 ? -1 : 1;
     interval = recover ? dir : (rnd(0, 1) < 0.5 ? -1 : 1);
   } else {
     const leapChance = 0.15 + Math.max(0, Math.min(1, tenseScore)) * 0.25;
-    const isLeap = rnd(0, 1) < leapChance;
+    const isLeap = forceLeap || rnd(0, 1) < leapChance;
     const stepSize = isLeap ? (1 + Math.floor(rnd(0, 2))) + 1 : 1;
-    interval = (rnd(0, 1) < 0.5 ? -1 : 1) * stepSize;
+    interval = (rnd(0, 1) < upProb ? 1 : -1) * stepSize;
   }
 
   degree += interval;
@@ -314,8 +372,9 @@ export function motifNote(motif, startDegree, wordIdx, prev) {
  * @param {{degree:number, octave:number}|null} prev
  * @param {number|null} chordRootDegree — from ambient.js's getCurrentChordDegree()
  * @param {number} [chordDirection=0] — from ambient.js's getChordDirection(): -1, 0, or 1
+ * @param {number} [registerBias=0] — -1..1, soft octave lean (see placeNearest)
  */
-export function harmonizeNote(prev, chordRootDegree, chordDirection = 0) {
+export function harmonizeNote(prev, chordRootDegree, chordDirection = 0, registerBias = 0) {
   if (chordRootDegree === null || chordRootDegree === undefined) return null;
   const len = currentScale.length;
   const tones = [...new Set(
@@ -325,7 +384,7 @@ export function harmonizeNote(prev, chordRootDegree, chordDirection = 0) {
   if (!prev) return placeNearest(tones[0], null);
   const prevFreq = currentScale[prev.degree] * prev.octave;
   const candidates = tones.map(t => {
-    const candidate = placeNearest(t, prev);
+    const candidate = placeNearest(t, prev, registerBias);
     const dist = Math.abs(Math.log2(candidate.freq / prevFreq));
     return { candidate, dist };
   });
