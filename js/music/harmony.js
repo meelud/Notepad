@@ -374,7 +374,38 @@ export function motifNote(motif, startDegree, wordIdx, prev) {
  * @param {number} [chordDirection=0] — from ambient.js's getChordDirection(): -1, 0, or 1
  * @param {number} [registerBias=0] — -1..1, soft octave lean (see placeNearest)
  */
+/**
+ * Weighted arbitration between competing melodic candidates (Tier 2 of
+ * a two-tier constraint model — see music/intention.js's design notes).
+ * Cadence and motif remain hard overrides by design (a cadence that
+ * doesn't fully resolve isn't a cadence; a motif that gets diluted
+ * isn't recognizable as one) — arbitration is only needed where two
+ * SOFT preferences compete, specifically harmony's chord-tone pull
+ * against the semantic/tension-driven stepwise line, which previously
+ * used a hard fallback chain (harmony always wins if available) that
+ * silently discarded strong semantic signals (e.g. isDisruption) on
+ * exactly the strong-beat/high-weight words most likely to trigger
+ * them. This is a probabilistic WEIGHTED choice, not a fixed order —
+ * deterministic via the shared seeded rnd(), so "same text → same
+ * performance" is preserved.
+ * @param {Array<{note:Object, weight:number}>} candidates — at least one
+ * @returns {Object} the chosen note
+ */
+function arbitrate(candidates) {
+  const total = candidates.reduce((s, c) => s + Math.max(0, c.weight), 0);
+  if (total <= 0) return candidates[0].note;
+  let r = rnd(0, total);
+  for (const c of candidates) {
+    r -= Math.max(0, c.weight);
+    if (r <= 0) return c.note;
+  }
+  return candidates[candidates.length - 1].note;
+}
+export { arbitrate };
+
 export function harmonizeNote(prev, chordRootDegree, chordDirection = 0, registerBias = 0) {
+
+
   if (chordRootDegree === null || chordRootDegree === undefined) return null;
   const len = currentScale.length;
   const tones = [...new Set(

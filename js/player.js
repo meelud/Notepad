@@ -4,7 +4,7 @@ import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getChordDirection } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote, harmonizeNote, globalTensionBias } from './music/harmony.js';
+import { deriveTextHarmony, hashText, resolveCadence, stepwiseNote, generateMotif, motifSequenceStartDegree, motifNote, harmonizeNote, globalTensionBias, arbitrate } from './music/harmony.js';
 import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions } from './music/intention.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
@@ -317,8 +317,30 @@ export async function play() {
         const effectiveTense = GLOBAL_TENSION_ENABLED
           ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress)))
           : sessionTenseScore;
-        note = (chordDeg !== null && harmonizeNote(lastNote, chordDeg, CONTRARY_MOTION_ENABLED ? getChordDirection() : 0, REGISTER_BIAS_ENABLED ? intention.contourBias : 0))
-          || stepwiseNote(lastNote, effectiveTense, intention.contourBias, intention.isDisruption && isFirstWordOfClause);
+        // Tier 2 arbitration: harmony's chord-tone pull and the
+        // semantic/tension-driven stepwise line are both legitimate
+        // SOFT preferences, not a strict override chain — a genuine
+        // semantic pivot (isDisruption, or a strong contourBias) now
+        // gets a real, weighted chance to win even on a strong beat,
+        // instead of harmony silently discarding it every time it's
+        // available. Cadence/motif above stay hard overrides on
+        // purpose (see arbitrate's docstring in harmony.js).
+        const isDisruptionNow = intention.isDisruption && isFirstWordOfClause;
+        const harmonyCandidate = chordDeg !== null
+          ? harmonizeNote(lastNote, chordDeg, CONTRARY_MOTION_ENABLED ? getChordDirection() : 0, REGISTER_BIAS_ENABLED ? intention.contourBias : 0)
+          : null;
+        const semanticCandidate = stepwiseNote(lastNote, effectiveTense, intention.contourBias, isDisruptionNow);
+
+        if (harmonyCandidate) {
+          const harmonyWeight = isStrongBeat ? 0.75 : 0.35;
+          const semanticWeight = 0.25 + Math.abs(intention.contourBias) * 0.4 + (isDisruptionNow ? 0.5 : 0);
+          note = arbitrate([
+            { note: harmonyCandidate, weight: harmonyWeight },
+            { note: semanticCandidate, weight: semanticWeight },
+          ]);
+        } else {
+          note = semanticCandidate;
+        }
       }
       lastNote = note;
       wordIdxInSentence++;
