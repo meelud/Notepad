@@ -375,33 +375,161 @@ export function motifNote(motif, startDegree, wordIdx, prev) {
  * @param {number} [registerBias=0] — -1..1, soft octave lean (see placeNearest)
  */
 /**
- * Weighted arbitration between competing melodic candidates (Tier 2 of
- * a two-tier constraint model — see music/intention.js's design notes).
- * Cadence and motif remain hard overrides by design (a cadence that
- * doesn't fully resolve isn't a cadence; a motif that gets diluted
- * isn't recognizable as one) — arbitration is only needed where two
- * SOFT preferences compete, specifically harmony's chord-tone pull
- * against the semantic/tension-driven stepwise line, which previously
- * used a hard fallback chain (harmony always wins if available) that
- * silently discarded strong semantic signals (e.g. isDisruption) on
- * exactly the strong-beat/high-weight words most likely to trigger
- * them. This is a probabilistic WEIGHTED choice, not a fixed order —
- * deterministic via the shared seeded rnd(), so "same text → same
- * performance" is preserved.
- * @param {Array<{note:Object, weight:number}>} candidates — at least one
+/**
+ * Softmax-weighted selection over scored candidates — the sampling
+ * primitive for Tier 2 arbitration (see buildCandidatePool/
+ * scoreCandidate below). Deliberately separates TWO independent
+ * concerns that a plain "weight = probability" scheme conflates:
+ *   - `score`  is a musical PREFERENCE (can be any real number,
+ *     negative included — e.g. a large voice-leading cost legitimately
+ *     makes a candidate worse, not just "less likely by some amount")
+ *   - `temperature` controls how much randomness is allowed around
+ *     that preference (low = near-deterministic best-pick, high = more
+ *     exploratory) — a musically meaningful, independently-tunable
+ *     axis that a raw weight cannot represent on its own.
+ * Deterministic via the shared seeded rnd().
+ * @param {Array<{note:Object, score:number}>} candidates — at least one
+ * @param {number} [temperature=0.4]
  * @returns {Object} the chosen note
  */
-function arbitrate(candidates) {
-  const total = candidates.reduce((s, c) => s + Math.max(0, c.weight), 0);
-  if (total <= 0) return candidates[0].note;
+function arbitrate(candidates, temperature = 0.4) {
+  if (candidates.length === 1) return candidates[0].note;
+  const t = Math.max(0.05, temperature); // guard against div-by-zero / degenerate softmax
+  const maxScore = Math.max(...candidates.map(c => c.score));
+  const expScores = candidates.map(c => Math.exp((c.score - maxScore) / t)); // subtract max for numerical stability
+  const total = expScores.reduce((a, b) => a + b, 0);
   let r = rnd(0, total);
-  for (const c of candidates) {
-    r -= Math.max(0, c.weight);
-    if (r <= 0) return c.note;
+  for (let i = 0; i < candidates.length; i++) {
+    r -= expScores[i];
+    if (r <= 0) return candidates[i].note;
   }
   return candidates[candidates.length - 1].note;
 }
 export { arbitrate };
+
+/**
+ * Builds the Tier 2 candidate pool: up to 4 chord tones (if a live
+ * chord is available) plus a small set of stepwise alternatives —
+ * genuine competing options, not two pre-decided "winners" from
+ * harmonizeNote/stepwiseNote. The gap-fill-aware stepwise candidate
+ * (identical to what stepwiseNote alone would have produced) is
+ * always included, preserving that already-validated behavior as one
+ * option among several rather than silently discarding it.
+ * @param {{degree:number, octave:number, lastInterval?:number}|null} prev
+ * @param {number|null} chordRootDegree
+ * @param {number} tenseScore
+ * @param {number} contourBias
+ * @param {boolean} forceLeap
+ * @param {number} registerBias
+ * @returns {Array<{note:Object, isChordTone:boolean}>}
+ */
+function buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, forceLeap, registerBias) {
+  const pool = [];
+  if (chordRootDegree !== null && chordRootDegree !== undefined) {
+    const len = currentScale.length;
+    const tones = [...new Set(
+      [chordRootDegree, chordRootDegree + 2, chordRootDegree + 4, chordRootDegree + 6]
+        .map(d => ((d % len) + len) % len)
+    )];
+    tones.forEach(t => pool.push({ note: placeNearest(t, prev, registerBias), isChordTone: true }));
+  }
+  // the fully gap-fill/leap-chance-aware candidate — same procedure
+  // stepwiseNote has always used, kept intact as one pool member
+  pool.push({ note: stepwiseNote(prev, tenseScore, contourBias, forceLeap), isChordTone: false });
+  // two plain neighbor-step alternatives, giving arbitration real
+  // options beyond the two previously-hardcoded "winners"
+  if (prev) {
+    const len = currentScale.length;
+    [1, -1].forEach(step => {
+      let degree = prev.degree + step, octave = prev.octave;
+      const octRange = octaveRangeForCurrentMood();
+      while (degree >= len) { degree -= len; octave = octRange[Math.min(octRange.length - 1, octRange.indexOf(octave) + 1)]; }
+      while (degree < 0)    { degree += len; octave = octRange[Math.max(0, octRange.indexOf(octave) - 1)]; }
+      pool.push({ note: { degree, octave, freq: currentScale[degree] * octave, lastInterval: step }, isChordTone: false });
+    });
+  }
+  return pool;
+}
+
+/**
+ * Scores one candidate on three independent, context-weighted axes —
+ * this is what makes Tier 2 arbitration a real trade-off instead of a
+ * single ad hoc number:
+ *   - voiceLeading: SMALLER leap from prev is always better (basic
+ *     counterpoint economy) — this axis is never zero-weighted, voice
+ *     leading always matters at least somewhat, regardless of context.
+ *   - harmonicFit: is this candidate a tone of the live chord — weighted
+ *     up on strong beats (harmony matters more there), down on weak
+ *     beats, matching the musical intuition the old hard rule encoded,
+ *     but now as a soft, comparable preference instead of a filter.
+ *   - semanticAlignment: does this candidate's direction agree with
+ *     the clause's contourBias, and — if this is a genuine disruption
+ *     event — does it register as a real leap in the disruption's
+ *     implied direction. Scaled by |contourBias| and a bounded
+ *     disruption bonus, so it competes on the same footing as the
+ *     other two axes instead of a separate ad hoc override.
+ * @param {{note:Object, isChordTone:boolean}} candidate
+ * @param {{degree:number, octave:number}|null} prev
+ * @param {{isStrongBeat:boolean, contourBias:number, isDisruption:boolean}} context
+ */
+function scoreCandidate(candidate, prev, context) {
+  const { note, isChordTone } = candidate;
+  const W_VOICE = 1.0;
+  const W_HARMONY = context.isStrongBeat ? 1.1 : 0.35;
+  const W_SEMANTIC = 0.3 + Math.abs(context.contourBias) * 0.5 + (context.isDisruption ? 0.5 : 0);
+  const W_CONTRARY = context.chordDirection !== 0 ? 0.4 : 0;
+
+  let voiceLeadingCost = 0;
+  if (prev) {
+    const prevFreq = currentScale[prev.degree] * prev.octave;
+    voiceLeadingCost = Math.abs(Math.log2(note.freq / prevFreq));
+  }
+  const harmonicFit = isChordTone ? 1 : 0;
+
+  let semanticAlignment = 0;
+  if (prev && context.contourBias !== 0) {
+    const moveSign = Math.sign(note.degree - prev.degree);
+    const biasSign = Math.sign(context.contourBias);
+    semanticAlignment += moveSign === biasSign ? 1 : (moveSign === 0 ? 0 : -0.5);
+  }
+  if (context.isDisruption && Math.abs(note.lastInterval || 0) >= 2) semanticAlignment += 1;
+
+  // Contrary motion (first-species counterpoint — Fux, 1725): when the
+  // chord itself just moved a clear direction, prefer the melody
+  // moving the OPPOSITE way (or staying put) — restores what
+  // harmonizeNote's chordDirection bias used to do, now as one more
+  // scored axis instead of a separate filter-then-pick step.
+  let contraryAlignment = 0;
+  if (prev && context.chordDirection !== 0) {
+    const moveSign = Math.sign(note.degree - prev.degree);
+    contraryAlignment = moveSign === 0 ? 0.5 : (moveSign === -context.chordDirection ? 1 : -0.5);
+  }
+
+  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment;
+}
+
+/**
+ * Tier 2 arbitration entry point: builds the candidate pool, scores
+ * every candidate on the three axes above, and samples via
+ * temperature-controlled softmax. Replaces the old two-candidate
+ * hard-fallback/weighted-random scheme with genuine multi-candidate,
+ * multi-axis competition. Tier 1 (resolveCadence, motifNote) is
+ * entirely separate and untouched by this function.
+ * @param {{degree:number, octave:number, lastInterval?:number}|null} prev
+ * @param {number|null} chordRootDegree
+ * @param {number} tenseScore
+ * @param {number} contourBias
+ * @param {boolean} isDisruption
+ * @param {boolean} isStrongBeat
+ * @param {number} [chordDirection=0] — -1, 0, or 1, from ambient.js's getChordDirection()
+ * @param {number} [registerBias=0]
+ * @param {number} [temperature=0.4]
+ */
+export function arbitrateMelodyNote(prev, chordRootDegree, tenseScore, contourBias, isDisruption, isStrongBeat, chordDirection = 0, registerBias = 0, temperature = 0.4) {
+  const pool = buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, isDisruption, registerBias);
+  const scored = pool.map(c => ({ note: c.note, score: scoreCandidate(c, prev, { isStrongBeat, contourBias, isDisruption, chordDirection }) }));
+  return arbitrate(scored, temperature);
+}
 
 export function harmonizeNote(prev, chordRootDegree, chordDirection = 0, registerBias = 0) {
 
