@@ -17,6 +17,7 @@ let stopping = false;
 let rec = null;
 let chunks = [];
 let audioBlob = null;
+let audioMimeType = 'audio/webm';
 let harmonyLocked = false;
 let lastHarmonyText = null; // the text harmonyLocked was derived from — auto-invalidates the lock if the text changes
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
@@ -41,6 +42,7 @@ const SEMANTIC_WEIGHT_THRESHOLD = 0.5; // lexicon match strength that earns chor
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
+export function getAudioMimeType() { return audioMimeType; }
 
 // ─── Voice selection by sentence type ───────────────────────────
 const VOICE_GROUPS = {
@@ -180,9 +182,10 @@ export async function play() {
   // playback should still work, just without the Save button.
   try {
     rec = new MediaRecorder(sd.stream);
+    audioMimeType = rec.mimeType || 'audio/webm';
     rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     rec.onstop = () => {
-      audioBlob = new Blob(chunks, { type: 'audio/webm' });
+      audioBlob = new Blob(chunks, { type: audioMimeType });
       bSave.disabled = false;
     };
     rec.start();
