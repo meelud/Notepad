@@ -17,7 +17,6 @@ let stopping = false;
 let rec = null;
 let chunks = [];
 let audioBlob = null;
-let audioMimeType = 'audio/webm';
 let harmonyLocked = false;
 let lastHarmonyText = null; // the text harmonyLocked was derived from — auto-invalidates the lock if the text changes
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
@@ -28,6 +27,7 @@ let pieceIntentions = []; // clause-level Musical Intention sequence — see mus
 // semantics (contrast/contour) entirely, reverting to prior behavior.
 const MUSICAL_INTENTION_ENABLED = true;
 const REGISTER_BIAS_ENABLED = true;
+const NEIGHBOR_TONE_ENABLED = true;
 
 // Item #3 (global tension profile) toggle — flip to false to instantly
 // revert to pure per-sentence tenseScore for A/B comparison.
@@ -42,7 +42,7 @@ const SEMANTIC_WEIGHT_THRESHOLD = 0.5; // lexicon match strength that earns chor
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
-export function getAudioMimeType() { return audioMimeType; }
+export function getAudioMimeType() { return rec && rec.mimeType ? rec.mimeType : 'audio/webm'; }
 
 // ─── Voice selection by sentence type ───────────────────────────
 const VOICE_GROUPS = {
@@ -182,10 +182,9 @@ export async function play() {
   // playback should still work, just without the Save button.
   try {
     rec = new MediaRecorder(sd.stream);
-    audioMimeType = rec.mimeType || 'audio/webm';
     rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     rec.onstop = () => {
-      audioBlob = new Blob(chunks, { type: audioMimeType });
+      audioBlob = new Blob(chunks, { type: 'audio/webm' });
       bSave.disabled = false;
     };
     rec.start();
@@ -227,6 +226,7 @@ export async function play() {
   let lastNote = null; // melodic contour state: {degree, octave, lastInterval} — persists across sentences for register continuity
   let sentenceCycle = 0;       // 1-based count of sentences seen so far
   let wordIdxInSentence = 0;   // 0-based position of the current word within its sentence
+  let pendingNeighborTarget = null; // {degree} — set after a weak-beat step-away, offers a return bonus on the NEXT weak-beat note (neighbor tone pattern)
   let sentenceUsesMotif = false;
   let sentenceStartDegree = 0;
   let wordGlobalIndex = 0; // 0-based position of this word across the WHOLE text (for global tension arc)
@@ -327,6 +327,7 @@ export async function play() {
         // by a single ad hoc weight. Cadence/motif above stay hard
         // overrides on purpose (Tier 1 — see arbitrate's docstring).
         const isDisruptionNow = intention.isDisruption && isFirstWordOfClause;
+        const prevDegreeBeforeThisNote = lastNote ? lastNote.degree : null;
         note = arbitrateMelodyNote(
           lastNote,
           chordDeg,
@@ -335,8 +336,19 @@ export async function play() {
           isDisruptionNow,
           isStrongBeat,
           CONTRARY_MOTION_ENABLED ? getChordDirection() : 0,
-          REGISTER_BIAS_ENABLED ? intention.contourBias : 0
+          REGISTER_BIAS_ENABLED ? intention.contourBias : 0,
+          NEIGHBOR_TONE_ENABLED ? pendingNeighborTarget?.degree : null
         );
+        // neighbor-tone bookkeeping: any pending return offer is consumed
+        // (used or not) after one word, so its influence stays local;
+        // a fresh offer is set only on a genuine weak-beat single step
+        // away from the previous note — the classic "leave, then return"
+        // shape, not every note (which would just be noise).
+        pendingNeighborTarget = null;
+        if (NEIGHBOR_TONE_ENABLED && !isStrongBeat && !isCadence && prevDegreeBeforeThisNote !== null
+            && Math.abs(note.lastInterval || 0) === 1) {
+          pendingNeighborTarget = { degree: prevDegreeBeforeThisNote };
+        }
       }
       lastNote = note;
       wordIdxInSentence++;

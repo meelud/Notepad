@@ -423,7 +423,7 @@ export { arbitrate };
  * @param {number} registerBias
  * @returns {Array<{note:Object, isChordTone:boolean}>}
  */
-function buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, forceLeap, registerBias) {
+function buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, forceLeap, registerBias, neighborReturnDegree) {
   const pool = [];
   if (chordRootDegree !== null && chordRootDegree !== undefined) {
     const len = currentScale.length;
@@ -447,6 +447,14 @@ function buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, forc
       while (degree < 0)    { degree += len; octave = octRange[Math.max(0, octRange.indexOf(octave) - 1)]; }
       pool.push({ note: { degree, octave, freq: currentScale[degree] * octave, lastInterval: step }, isChordTone: false });
     });
+  }
+  // explicit "return" candidate for the neighbor-tone pattern — without
+  // this, scoreCandidate's neighborReturn bonus would be checking for a
+  // candidate that never actually exists in the pool otherwise (every
+  // other candidate above has a nonzero interval from prev by
+  // construction), silently making the whole feature a no-op.
+  if (prev && neighborReturnDegree != null) {
+    pool.push({ note: placeNearest(neighborReturnDegree, prev, registerBias), isChordTone: false });
   }
   return pool;
 }
@@ -520,7 +528,15 @@ function scoreCandidate(candidate, prev, context) {
     contraryAlignment = pitchMoveSign === 0 ? 0.5 : (pitchMoveSign === -context.chordDirection ? 1 : -0.5);
   }
 
-  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment;
+  // Neighbor tone (traditional counterpoint's second free-tone pattern
+  // alongside the passing tone): a small bonus for landing exactly back
+  // on the degree a prior weak-beat step just left — see player.js's
+  // pendingNeighborTarget. Bounded to the same [0,1] range as the other
+  // binary/near-binary axes.
+  const neighborReturn = (context.neighborReturnDegree != null && note.degree === context.neighborReturnDegree) ? 1 : 0;
+
+  const W_NEIGHBOR = context.isStrongBeat ? 0 : 0.5;
+  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment + W_NEIGHBOR * neighborReturn;
 }
 
 /**
@@ -540,9 +556,21 @@ function scoreCandidate(candidate, prev, context) {
  * @param {number} [registerBias=0]
  * @param {number} [temperature=0.4]
  */
-export function arbitrateMelodyNote(prev, chordRootDegree, tenseScore, contourBias, isDisruption, isStrongBeat, chordDirection = 0, registerBias = 0, temperature = 0.4) {
-  const pool = buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, isDisruption, registerBias);
-  const scored = pool.map(c => ({ note: c.note, score: scoreCandidate(c, prev, { isStrongBeat, contourBias, isDisruption, chordDirection }) }));
+/**
+ * @param {{degree:number, octave:number, lastInterval?:number}|null} prev
+ * @param {number|null} chordRootDegree
+ * @param {number} tenseScore
+ * @param {number} contourBias
+ * @param {boolean} isDisruption
+ * @param {boolean} isStrongBeat
+ * @param {number} [chordDirection=0]
+ * @param {number} [registerBias=0]
+ * @param {number|null} [neighborReturnDegree=null] — see player.js's pendingNeighborTarget
+ * @param {number} [temperature=0.4]
+ */
+export function arbitrateMelodyNote(prev, chordRootDegree, tenseScore, contourBias, isDisruption, isStrongBeat, chordDirection = 0, registerBias = 0, neighborReturnDegree = null, temperature = 0.4) {
+  const pool = buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, isDisruption, registerBias, neighborReturnDegree);
+  const scored = pool.map(c => ({ note: c.note, score: scoreCandidate(c, prev, { isStrongBeat, contourBias, isDisruption, chordDirection, neighborReturnDegree }) }));
   return arbitrate(scored, temperature);
 }
 
