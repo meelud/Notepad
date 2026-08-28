@@ -1,6 +1,7 @@
 import { editor, render, ph, bPlay, bStop, bSave, bClear, wcEl } from './dom.js';
 import { play, stop, isPlaying, getAudioBlob, getAudioMimeType, resetHarmony, clearAudioState } from './player.js';
 import { showPersonaToast } from './persona.js';
+import { blobToMp3 } from './audio/mp3encode.js';
 
 // maps a MediaRecorder mimeType to a real, matching file extension —
 // browsers don't all produce webm (e.g. Safari commonly gives mp4)
@@ -27,13 +28,24 @@ export function initUI() {
   bPlay.addEventListener('click', play);
   bStop.addEventListener('click', stop);
 
-  bSave.addEventListener('click', () => {
+  bSave.addEventListener('click', async () => {
     const blob = getAudioBlob();
     if (!blob) return;
-    const ext = extensionFor(getAudioMimeType());
     const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
-    const filename = `${slugFromText(editor.value)}-${stamp}.${ext}`;
-    const url = URL.createObjectURL(blob);
+    const base = `${slugFromText(editor.value)}-${stamp}`;
+
+    showPersonaToast('Encoding to MP3…');
+    let outBlob = blob;
+    let filename = `${base}.${extensionFor(getAudioMimeType())}`;
+    try {
+      outBlob = await blobToMp3(blob);
+      filename = `${base}.mp3`;
+    } catch (err) {
+      // MP3 encoding failed (e.g. decodeAudioData issue on this browser) —
+      // fall back to the original recording so Save still works.
+    }
+
+    const url = URL.createObjectURL(outBlob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
