@@ -94,11 +94,30 @@ function splitClauses(text) {
  * splitClauses), so re-applying them here would double-count.
  * @param {string} clauseText
  */
+/**
+ * Sums signed lexicon sentiment over a clause's words, WITH negation
+ * awareness — "I am not happy" must NOT score the same as "I am
+ * happy". Uses the same NEGATION_WINDOW proximity rule as mood.js's
+ * sentence-level scoring (a negator within a small word-distance flips
+ * the sign), just applied at clause granularity. Intentionally lighter
+ * than mood.js otherwise: no intensifier/diminisher/contrast weighting
+ * here — those already shape the clause boundaries themselves (see
+ * splitClauses), so re-applying them here would double-count.
+ *
+ * Also normalizes English contractions (n't -> not) BEFORE extracting
+ * words, mirroring mood.js's detectMood exactly. Without this,
+ * "don't"/"isn't"/"can't" etc. get split by WORD_RE into meaningless
+ * fragments ("don","t") that never match NEGATORS — silently
+ * disabling negation for nearly all English contractions. Confirmed
+ * bug: "I don't feel happy" produced contourBias=0 while the
+ * semantically identical "I do not feel happy" correctly produced -1.
+ * @param {string} clauseText
+ */
 function clauseSentiment(clauseText) {
-  const words = clauseText.match(WORD_RE) || [];
-  const lower = words.map(w => w.toLowerCase());
+  const normalized = clauseText.toLowerCase().replace(/n['’]t\b/g, ' not');
+  const words = normalized.match(WORD_RE) || [];
   const negatorPositions = [];
-  lower.forEach((w, i) => { if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i); });
+  words.forEach((w, i) => { if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i); });
   const isNegated = (i) => negatorPositions.some(p => p !== i && Math.abs(p - i) <= NEGATION_WINDOW);
 
   let sum = 0;
