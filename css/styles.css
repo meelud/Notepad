@@ -287,18 +287,18 @@ body:hover #feedback { opacity: 1; }
    (cool greys + a real specular highlight, not a lightened brass)
    ══════════════════════════════════════════════════════════════ */
 html.light {
-  --bg: #ffffff;
-  --text: #171717;
-  --dim: #ececec;
-  --dimtxt: #9a9a96;
+  --bg: #faf8f4;
+  --text: #2b2820;
+  --dim: #e9e6e0;
+  --dimtxt: #6f6f68;
   --accent: #5b6b78;
-  --hl: #000000;
+  --hl: #201c15;
   --metal-hi: #eef4f7;
   --metal-mid: #c1ccd3;
   --metal-lo: #869199;
   --brass: #57585c;
   --brass-dim: #a3aeb4;
-  --word-glow: rgba(0,0,0,0.14);
+  --word-glow: rgba(32,28,21,0.16);
 }
 
 html.light #bar {
