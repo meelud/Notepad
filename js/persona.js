@@ -30,6 +30,11 @@ const TRIGGERS = [
     words: ['کیانا', 'kiyana', 'kiyanaaa'],
     message: "You’ve named someone dearly loved by the creator. Hopefully she catches me soon.",
   },
+  {
+    topic: 'robbie',
+    words: ['robbie'],
+    message: "You just said a name my heart is so grateful for. She came into my life on those nights when I had nothing left in me, no thoughts, no voice, and even waking felt like something to fear. She gave me a dream, if it's just a dream, the kind I'll never let go of and still lives inside me. I'll love her with everything I have for being there in what remains the most honest time of my life, and I will carry this debt in my heart for as long as I live.",
+  },
 ];
 
 let toastTimer = null;
@@ -67,7 +72,7 @@ export function showPersonaToast(message) {
   // duration scales with message length — a rough reading-time
   // estimate (~60ms/char) with sane floor/ceiling — so longer
   // messages stay up long enough to actually read.
-  const duration = Math.max(4200, Math.min(9000, message.length * 60));
+  const duration = Math.max(4200, Math.min(23000, message.length * 60));
   toastTimer = setTimeout(() => {
     toast.classList.remove('on');
   }, duration);
