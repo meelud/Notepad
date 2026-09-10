@@ -90,22 +90,22 @@ export function showRobbieQuiz() {
   const feedback = document.createElement('div');
   feedback.style.cssText = 'min-height:28px;margin-top:112px;color:#e8e2d6;font-family:"EB Garamond",serif;font-size:18px;font-style:normal;';
 
+  let answered = false;
   btn.onclick = () => {
+    if (answered) return;
     const v = input.value.trim().toLowerCase();
     if (v === 'nebraska') {
-      input.disabled = true;
-      btn.disabled = true;
-      setTimeout(() => {
-        const robbie = TRIGGERS.find(t => t.topic === 'robbie');
-        box.innerHTML = '';
-        box.style.maxWidth = '600px';
-        const done = document.createElement('div');
-        done.textContent = robbie ? robbie.message : 'nebraska';
-        done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:22px 26px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
-        done.onclick = () => overlay.remove();
-        box.appendChild(done);
-        requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
-      }, 2200);
+      answered = true;
+      input.readOnly = true;
+      const robbie = TRIGGERS.find(t => t.topic === 'robbie');
+      box.innerHTML = '';
+      box.style.maxWidth = '600px';
+      const done = document.createElement('div');
+      done.textContent = robbie ? robbie.message : 'nebraska';
+      done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:22px 26px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
+      done.onclick = () => overlay.remove();
+      box.appendChild(done);
+      requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
     } else {
       feedback.textContent = "you're wrong my dear";
     }
