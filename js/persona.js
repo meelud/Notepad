@@ -95,7 +95,6 @@ export function showRobbieQuiz() {
     if (v === 'nebraska') {
       input.disabled = true;
       btn.disabled = true;
-      feedback.textContent = "you're right my dear";
       setTimeout(() => {
         const robbie = TRIGGERS.find(t => t.topic === 'robbie');
         box.innerHTML = '';
