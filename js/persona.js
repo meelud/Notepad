@@ -74,7 +74,7 @@ export function showRobbieQuiz() {
   box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
 
   const q = document.createElement('div');
-  q.textContent = "What do I say when you tell me you're hungry?";
+  q.textContent = "What would I say when you tell me you're hungry?";
   q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
 
   const input = document.createElement('input');
@@ -98,7 +98,7 @@ export function showRobbieQuiz() {
       box.style.maxWidth = '600px';
       const done = document.createElement('div');
       done.textContent = robbie ? robbie.message : 'nebraska';
-      done.style.cssText = 'color:#e8e2d6;font-family:"EB Garamond",serif;font-size:21px;line-height:1.9;text-align:center;padding:10px 4px;cursor:pointer;';
+      done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:22px 26px;box-sizing:border-box;cursor:pointer;';
       done.onclick = () => overlay.remove();
       box.appendChild(done);
     } else {
