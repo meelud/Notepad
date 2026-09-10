@@ -121,17 +121,20 @@ export function showPersonaToast(message, big = false) {
   if (!toast) return;
   clearTimeout(toastTimer);
   if (big) {
-    toast.style.fontSize = '17px';
+    const isMobile = window.innerWidth <= 480;
+    toast.style.fontSize = isMobile ? '15px' : '17px';
     toast.style.lineHeight = '1.8';
     toast.style.bottom = '140px';
-    toast.style.padding = '20px 28px';
-    toast.style.maxWidth = '88vw';
+    toast.style.padding = isMobile ? '14px 12px' : '16px 16px';
+    toast.style.maxWidth = '94vw';
+    toast.style.width = 'max-content';
   } else {
     toast.style.fontSize = '';
     toast.style.lineHeight = '';
     toast.style.bottom = '';
     toast.style.padding = '';
     toast.style.maxWidth = '';
+    toast.style.width = '';
   }
   toast.textContent = message;
   // force reflow so re-triggering restarts the transition cleanly
