@@ -93,9 +93,14 @@ export function showRobbieQuiz() {
   btn.onclick = () => {
     const v = input.value.trim().toLowerCase();
     if (v === 'nebraska') {
-      overlay.remove();
       const robbie = TRIGGERS.find(t => t.topic === 'robbie');
-      if (robbie) showPersonaToast(robbie.message, true);
+      box.innerHTML = '';
+      box.style.maxWidth = '600px';
+      const done = document.createElement('div');
+      done.textContent = robbie ? robbie.message : 'nebraska';
+      done.style.cssText = 'color:#e8e2d6;font-family:"EB Garamond",serif;font-size:21px;line-height:1.9;text-align:center;padding:10px 4px;cursor:pointer;';
+      done.onclick = () => overlay.remove();
+      box.appendChild(done);
     } else {
       feedback.textContent = "you're wrong my dear";
     }
@@ -122,11 +127,11 @@ export function showPersonaToast(message, big = false) {
   clearTimeout(toastTimer);
   if (big) {
     const isMobile = window.innerWidth <= 480;
-    toast.style.fontSize = isMobile ? '15px' : '17px';
-    toast.style.lineHeight = '1.8';
+    toast.style.fontSize = isMobile ? '13px' : '17px';
+    toast.style.lineHeight = isMobile ? '1.6' : '1.8';
     toast.style.bottom = '140px';
-    toast.style.padding = isMobile ? '14px 12px' : '16px 16px';
-    toast.style.maxWidth = '94vw';
+    toast.style.padding = isMobile ? '12px 10px' : '16px 16px';
+    toast.style.maxWidth = '96vw';
     toast.style.width = 'max-content';
   } else {
     toast.style.fontSize = '';
