@@ -9,7 +9,7 @@ import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions } from './music/intention.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
-import { findPersonaMessage, showPersonaToast } from './persona.js';
+import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieQuiz } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let playing = false;
@@ -431,8 +431,12 @@ export async function play() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
 
   if (completedNaturally) {
-    const msg = findPersonaMessage(text);
-    if (msg) showPersonaToast(msg);
+    if (isRobbieText(text)) {
+      showRobbieQuiz();
+    } else {
+      const msg = findPersonaMessage(text);
+      if (msg) showPersonaToast(msg);
+    }
   }
 }
 

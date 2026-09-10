@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "You just said a name my heart is so grateful for. She came into my life on those nights when I had nothing left in me, no thoughts, no voice, and even waking felt like something to fear. She gave me a dream, if it's just a dream, the kind I'll never let go of and still lives inside me. I'll love her with everything I have for being there in what remains the most honest time of my life, and I will carry this debt in my heart for as long as I live.",
+    message: "hey love, hope you enjoyed the birthday. I'm sure she'll love your gift. I miss you. I'm having a smoke and it doesn't taste good, it just smells of missing you.",
   },
 ];
 
@@ -55,14 +55,84 @@ export function findPersonaMessage(text) {
   return pick.message;
 }
 
+export function isRobbieText(text) {
+  return text.toLowerCase().includes('robbie');
+}
+
+// ─── Robbie quiz ────────────────────────────────────────────────
+// Additive easter-egg: instead of a plain toast, Robbie gets a
+// question + answer box. Correct answer ("nebraska") reveals the
+// robbie message; wrong answer shows "you're wrong".
+export function showRobbieQuiz() {
+  document.getElementById('robbie-quiz')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'robbie-quiz';
+  overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:50;padding:20px;box-sizing:border-box;';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
+
+  const q = document.createElement('div');
+  q.textContent = "What do I say when you tell me you're hungry?";
+  q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.style.cssText = 'display:block;width:100%;max-width:240px;margin:8px auto 0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(196,168,108,0.35);border-radius:0;color:#e8e2d6;font-family:"EB Garamond",serif;font-size:19px;letter-spacing:0.08em;padding:6px 4px;outline:none;text-align:center;';
+
+  const btn = document.createElement('button');
+  btn.textContent = 'send';
+  btn.style.cssText = 'margin-top:10px;background:none;border:none;font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#a48a52;cursor:pointer;padding:6px 12px;opacity:0.8;';
+
+  const feedback = document.createElement('div');
+  feedback.style.cssText = 'min-height:28px;margin-top:112px;color:#e8e2d6;font-family:"EB Garamond",serif;font-size:18px;font-style:normal;';
+
+  btn.onclick = () => {
+    const v = input.value.trim().toLowerCase();
+    if (v === 'nebraska') {
+      overlay.remove();
+      const robbie = TRIGGERS.find(t => t.topic === 'robbie');
+      if (robbie) showPersonaToast(robbie.message, true);
+    } else {
+      feedback.textContent = "you're wrong my dear";
+    }
+  };
+  input.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') btn.click();
+  };
+
+  box.append(q, input, btn, feedback);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  input.focus();
+}
+
 /**
  * Shows the toast with the given message, then fades it out after a
  * few seconds. Safe to call repeatedly — resets its own timer.
  * @param {string} message
  */
-export function showPersonaToast(message) {
+export function showPersonaToast(message, big = false) {
   if (!toast) return;
   clearTimeout(toastTimer);
+  if (big) {
+    toast.style.fontSize = '17px';
+    toast.style.lineHeight = '1.8';
+    toast.style.bottom = '140px';
+    toast.style.padding = '20px 28px';
+    toast.style.maxWidth = '88vw';
+  } else {
+    toast.style.fontSize = '';
+    toast.style.lineHeight = '';
+    toast.style.bottom = '';
+    toast.style.padding = '';
+    toast.style.maxWidth = '';
+  }
   toast.textContent = message;
   // force reflow so re-triggering restarts the transition cleanly
   toast.classList.remove('on');
