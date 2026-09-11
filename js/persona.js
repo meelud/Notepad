@@ -74,7 +74,7 @@ export function showRobbieQuiz() {
   box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
 
   const q = document.createElement('div');
-  q.textContent = "Which hair color of yours do I love more than any other?";
+  q.textContent = "Which hair color of yours do I love the most?";
   q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
 
   const input = document.createElement('input');
