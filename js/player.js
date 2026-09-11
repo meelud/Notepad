@@ -7,6 +7,7 @@ import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getCh
 import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote } from './music/harmony.js';
 import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions } from './music/intention.js';
+import { deriveComposition } from './music/composition.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieQuiz } from './persona.js';
@@ -23,11 +24,15 @@ let sessionTenseScore = 0; // tenseScore of the current text, used to nudge paci
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
 let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
+let pieceComposition = null; // whole-piece section timeline — see music/composition.js
 // Musical Intention layer toggle — flip to false to ignore clause-level
 // semantics (contrast/contour) entirely, reverting to prior behavior.
 const MUSICAL_INTENTION_ENABLED = true;
 const REGISTER_BIAS_ENABLED = true;
 const NEIGHBOR_TONE_ENABLED = true;
+// Composition Layer toggle — flip to false to ignore the whole-piece
+// section timeline entirely, reverting to per-sentence-only behavior.
+const COMPOSITION_LAYER_ENABLED = true;
 
 // Item #3 (global tension profile) toggle — flip to false to instantly
 // revert to pure per-sentence tenseScore for A/B comparison.
@@ -133,6 +138,7 @@ export async function play() {
     sessionNormScore = harmonyInfo.normScore;
     pieceMotif = generateMotif(hashText(text), sessionTenseScore);
     pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
+    pieceComposition = COMPOSITION_LAYER_ENABLED ? deriveComposition(text) : null;
     harmonyLocked = true;
     lastHarmonyText = text;
   }
@@ -300,9 +306,16 @@ export async function play() {
 
     const freq = (() => {
       let note;
+      const progress = totalWordsInText > 1 ? wordGlobalIndex / (totalWordsInText - 1) : 0;
+      const compState = COMPOSITION_LAYER_ENABLED && pieceComposition ? pieceComposition.getStateAt(progress) : null;
+      const combinedRegisterBias = REGISTER_BIAS_ENABLED
+        ? Math.max(-1, Math.min(1, intention.contourBias + (compState ? compState.registerTendency * 0.5 : 0)))
+        : 0;
+      const motifAllowed = compState ? compState.motifActive : true;
+
       if (isCadence) {
-        note = resolveCadence(lastNote, tok.sentenceType, intention.cadenceStrength, REGISTER_BIAS_ENABLED ? intention.contourBias : 0);
-      } else if (sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
+        note = resolveCadence(lastNote, tok.sentenceType, intention.cadenceStrength, combinedRegisterBias);
+      } else if (motifAllowed && sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
         note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
       } else {
         // Harmonic awareness: on odd word positions within the sentence
@@ -316,9 +329,8 @@ export async function play() {
         const semanticWeight = SEMANTIC_STABILITY_ENABLED ? wordEmotionWeight(tok.text) : 0;
         const isSemanticallyStable = semanticWeight >= SEMANTIC_WEIGHT_THRESHOLD;
         const chordDeg = (isStrongBeat || isSemanticallyStable) ? getCurrentChordDegree() : null;
-        const progress = totalWordsInText > 1 ? wordGlobalIndex / (totalWordsInText - 1) : 0;
         const effectiveTense = GLOBAL_TENSION_ENABLED
-          ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress)))
+          ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + (compState ? compState.tension * 0.25 : 0)))
           : sessionTenseScore;
         // Tier 2 arbitration: harmony's chord-tone pull, semantic/
         // tension-driven motion, and plain voice-leading all compete
@@ -336,7 +348,7 @@ export async function play() {
           isDisruptionNow,
           isStrongBeat,
           CONTRARY_MOTION_ENABLED ? getChordDirection() : 0,
-          REGISTER_BIAS_ENABLED ? intention.contourBias : 0,
+          combinedRegisterBias,
           NEIGHBOR_TONE_ENABLED ? pendingNeighborTarget?.degree : null
         );
         // neighbor-tone bookkeeping: any pending return offer is consumed
