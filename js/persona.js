@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "hey Robbie, I look at your pics almost every day, and the blue one always makes my legs feel better, they're healing up.",
+    message: "hey Robbie, last night was one of the best I've had in a while. We didn't even talk but I felt you right here, I couldn't take my eyes off your name while I did everything, and I mean everything. I just wish I could've heard you breathe. Hopefully, real soon.",
   },
 ];
 
@@ -74,7 +74,7 @@ export function showRobbieQuiz() {
   box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
 
   const q = document.createElement('div');
-  q.textContent = "Which hair color of yours do I love the most?";
+  q.textContent = "What's your full full name? Type it in Farsi.";
   q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
 
   const input = document.createElement('input');
@@ -93,8 +93,8 @@ export function showRobbieQuiz() {
   let answered = false;
   btn.onclick = () => {
     if (answered) return;
-    const v = input.value.trim().toLowerCase();
-    if (v.includes('blue')) {
+    const v = input.value.trim().replace(/\s+/g, ' ');
+    if (v.includes('محیا') && v.includes('وایقان')) {
       answered = true;
       input.readOnly = true;
       const robbie = TRIGGERS.find(t => t.topic === 'robbie');
