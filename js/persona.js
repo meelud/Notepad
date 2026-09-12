@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "hey Robbie, last night was one of the best I've had in a while. We didn't even talk but I felt you right here, I couldn't take my eyes off your name while I did everything, and I mean everything. I just wish I could've heard you breathe. Hopefully, real soon.",
+    message: "hey Robbie, last night was one of the best I've had in a while. We didn't even talk but I felt you right here, I couldn't take my eyes off your name while I did everything, and I mean everything. I just wish I could've heard you breathing. One can dream.",
   },
 ];
 
