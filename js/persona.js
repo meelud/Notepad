@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "hey Robbie, last night was one of the best I've had in a while. We didn't even talk but I felt you right here, I couldn't take my eyes off your name while I did everything, and I mean everything. I just wish I could've heard you breathing. One can dream.",
+    message: "that rabbit I met in a dream, and still hear in the poems.",
   },
 ];
 
@@ -74,7 +74,7 @@ export function showRobbieQuiz() {
   box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
 
   const q = document.createElement('div');
-  q.textContent = "What's your full full name? Type it in Farsi.";
+  q.textContent = "What animal are you to me?";
   q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
 
   const input = document.createElement('input');
@@ -93,18 +93,24 @@ export function showRobbieQuiz() {
   let answered = false;
   btn.onclick = () => {
     if (answered) return;
-    const v = input.value.trim().replace(/\s+/g, ' ');
-    if (v.includes('محیا') && v.includes('وایقان')) {
+    const v = input.value.trim().toLowerCase();
+    if (v.includes('rabbit')) {
       answered = true;
       input.readOnly = true;
       const robbie = TRIGGERS.find(t => t.topic === 'robbie');
       box.innerHTML = '';
       box.style.maxWidth = '600px';
-      const done = document.createElement('div');
-      done.textContent = robbie ? robbie.message : 'nebraska';
-      done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:22px 26px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
-      done.onclick = () => overlay.remove();
-      box.appendChild(done);
+        const done = document.createElement('div');
+        done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:18px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
+        const pic = document.createElement('img');
+        pic.src = 'rabbit.jpg';
+        pic.alt = '';
+        pic.style.cssText = 'display:block;width:auto;max-width:100%;max-height:48vh;height:auto;margin:0 auto 16px;border-radius:3px;border:1px solid rgba(196,168,108,0.2);';
+        const cap = document.createElement('div');
+        cap.textContent = robbie ? robbie.message : 'rabbit';
+        done.append(pic, cap);
+        done.onclick = () => overlay.remove();
+        box.appendChild(done);
       requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
     } else {
       feedback.textContent = "you're wrong my dear";
