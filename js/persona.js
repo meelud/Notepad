@@ -105,7 +105,7 @@ export function showRobbieQuiz() {
         const pic = document.createElement('img');
         pic.src = 'rabbit.jpg';
         pic.alt = '';
-        pic.style.cssText = 'display:block;width:auto;max-width:100%;max-height:48vh;height:auto;margin:0 auto 16px;border-radius:3px;border:1px solid rgba(196,168,108,0.2);';
+        pic.style.cssText = 'display:block;width:auto;max-width:100%;max-height:54vh;height:auto;margin:0 auto 16px;border-radius:3px;border:1px solid rgba(196,168,108,0.2);';
         const cap = document.createElement('div');
         cap.textContent = robbie ? robbie.message : 'rabbit';
         done.append(pic, cap);
