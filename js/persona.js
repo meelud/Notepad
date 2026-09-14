@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "that rabbit I met in a dream, and still hear in the poems.",
+    message: "hey. not doing great today, so no questions. have a lovely time. thinking of you, i love you.",
   },
 ];
 
@@ -133,6 +133,30 @@ export function showRobbieQuiz() {
  * few seconds. Safe to call repeatedly — resets its own timer.
  * @param {string} message
  */
+export function showRobbieMessage() {
+  document.getElementById('robbie-quiz')?.remove();
+  const robbie = TRIGGERS.find(t => t.topic === 'robbie');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'robbie-quiz';
+  overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:50;padding:20px;box-sizing:border-box;';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:600px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
+
+  const done = document.createElement('div');
+  done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:22px 26px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
+  const cap = document.createElement('div');
+  cap.textContent = robbie ? robbie.message : '';
+  done.append(cap);
+  done.onclick = () => overlay.remove();
+  box.appendChild(done);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
+}
+
 export function showPersonaToast(message, big = false) {
   if (!toast) return;
   clearTimeout(toastTimer);
