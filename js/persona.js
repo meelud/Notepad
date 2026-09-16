@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "hey. not doing great today, so no questions. have a lovely time.",
+    message: "hey, writing this in the middle of the party right now. these past few days we barely got to talk, I've missed you so much. worse, haven't heard your voice at all. my legs are still healing with your hair, black, pink, blue, whatever it is now.",
   },
 ];
 
@@ -61,8 +61,8 @@ export function isRobbieText(text) {
 
 // ─── Robbie quiz ────────────────────────────────────────────────
 // Additive easter-egg: instead of a plain toast, Robbie gets a
-// question + answer box. Correct answer ("nebraska") reveals the
-// robbie message; wrong answer shows "you're wrong".
+// question + answer box. Correct answer ("sunday") reveals the
+// robbie message; wrong answer nudges her to tell the weekday.
 export function showRobbieQuiz() {
   document.getElementById('robbie-quiz')?.remove();
 
@@ -74,7 +74,7 @@ export function showRobbieQuiz() {
   box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
 
   const q = document.createElement('div');
-  q.textContent = "What animal are you to me?";
+  q.textContent = "Oct 11, what day's that?";
   q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
 
   const input = document.createElement('input');
@@ -94,7 +94,7 @@ export function showRobbieQuiz() {
   btn.onclick = () => {
     if (answered) return;
     const v = input.value.trim().toLowerCase();
-    if (v.includes('rabbit')) {
+    if (v.includes('sunday') || v.includes('sun')) {
       answered = true;
       input.readOnly = true;
       const robbie = TRIGGERS.find(t => t.topic === 'robbie');
@@ -102,18 +102,14 @@ export function showRobbieQuiz() {
       box.style.maxWidth = '600px';
         const done = document.createElement('div');
         done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:18px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
-        const pic = document.createElement('img');
-        pic.src = 'rabbit.jpg';
-        pic.alt = '';
-        pic.style.cssText = 'display:block;width:auto;max-width:100%;max-height:48vh;height:auto;margin:0 auto 16px;border-radius:3px;border:1px solid rgba(196,168,108,0.2);';
         const cap = document.createElement('div');
-        cap.textContent = robbie ? robbie.message : 'rabbit';
-        done.append(pic, cap);
+        cap.textContent = robbie ? robbie.message : 'sunday';
+        done.append(cap);
         done.onclick = () => overlay.remove();
         box.appendChild(done);
       requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
     } else {
-      feedback.textContent = "you're wrong my dear";
+      feedback.textContent = "no, give me the weekday";
     }
   };
   input.onkeydown = (e) => {

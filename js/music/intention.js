@@ -39,10 +39,58 @@ const WORD_RE = /[a-zA-Zا-ی]+/g;
  * sentence-ending punctuation, commas, and contrast words. A contrast
  * word starts its OWN new clause (and is excluded from the clause's
  * own text so it doesn't score itself).
+ *
+ * FIXED BUG: this used to be TWO separate loops run one after the
+ * other — first a full word-by-word scan for contrast words, THEN a
+ * full character scan for comma/sentence-end punctuation. Because the
+ * first loop ran to completion (advancing clauseStart as it went)
+ * BEFORE the second loop ever started, any sentence-end punctuation
+ * that occurred earlier in the text than a LATER contrast word got
+ * silently skipped: by the time the punctuation loop reached that
+ * position, clauseStart had already been pushed past it by the
+ * contrast-word loop, failing the `i >= clauseStart` guard. Example:
+ * "I love this city. It has great food. But then I got sick." — the
+ * two real sentence boundaries (after "city" and after "food") were
+ * both dropped, silently merging two independent sentences into one
+ * clause with a single contourBias/cadenceStrength, and neither
+ * boundary was ever marked isSentenceEnd.
+ *
+ * Fix: collect every boundary event (contrast word, comma, sentence-
+ * end punctuation) as {index, type} into one list, sort it by
+ * position, and process it in a single left-to-right pass so ordering
+ * is always correct regardless of which event type occurs first.
  * @param {string} text
  * @returns {Array<{start:number, end:number, isDisruption:boolean, isSentenceEnd:boolean}>}
  */
 function splitClauses(text) {
+  const events = [];
+
+  // word-by-word scan so contrast words are detected as whole words
+  // (not substrings) while still tracking precise character offsets
+  let m;
+  WORD_RE.lastIndex = 0;
+  while ((m = WORD_RE.exec(text))) {
+    const word = m[0].toLowerCase();
+    if (CONTRAST_WORDS.has(word)) {
+      events.push({ index: m.index, type: 'contrast' });
+    }
+  }
+
+  // comma and sentence-ending punctuation also break clauses
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === ',' || ch === '،') {
+      events.push({ index: i, type: 'comma' });
+    } else if ('.!?؟'.includes(ch)) {
+      events.push({ index: i, type: 'sentenceEnd' });
+    }
+  }
+
+  // single left-to-right pass over ALL boundary events in true text
+  // order — this is what guarantees a sentence-end occurring before a
+  // later contrast word is never skipped
+  events.sort((a, b) => a.index - b.index);
+
   const clauses = [];
   let clauseStart = 0;
   let pendingDisruption = false;
@@ -54,28 +102,23 @@ function splitClauses(text) {
     pendingDisruption = false;
   };
 
-  // word-by-word scan so contrast words can be detected as whole words
-  // (not substrings) while still tracking character offsets precisely
-  let m;
-  WORD_RE.lastIndex = 0;
-  let lastWordEnd = 0;
-  while ((m = WORD_RE.exec(text))) {
-    const word = m[0].toLowerCase();
-    lastWordEnd = m.index + m[0].length;
-    if (CONTRAST_WORDS.has(word)) {
-      pushClause(m.index, false);
-      clauseStart = m.index; // contrast word itself starts the new clause's range
-      pendingDisruption = true;
-    }
-  }
-
-  // comma and sentence-ending punctuation also break clauses
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === ',' || ch === '،') {
-      if (i >= clauseStart) { pushClause(i, false); clauseStart = i + 1; }
-    } else if ('.!?؟'.includes(ch)) {
-      if (i >= clauseStart) { pushClause(i, true); clauseStart = i + 1; }
+  for (const ev of events) {
+    if (ev.type === 'contrast') {
+      if (ev.index >= clauseStart) {
+        pushClause(ev.index, false);
+        clauseStart = ev.index; // contrast word itself starts the new clause's range
+        pendingDisruption = true;
+      }
+    } else if (ev.type === 'comma') {
+      if (ev.index >= clauseStart) {
+        pushClause(ev.index, false);
+        clauseStart = ev.index + 1;
+      }
+    } else { // sentenceEnd
+      if (ev.index >= clauseStart) {
+        pushClause(ev.index, true);
+        clauseStart = ev.index + 1;
+      }
     }
   }
   pushClause(text.length, true); // trailing clause with no terminal punctuation
@@ -83,17 +126,6 @@ function splitClauses(text) {
   return clauses.filter(c => WORD_RE.test(text.slice(c.start, c.end)));
 }
 
-/**
- * Sums signed lexicon sentiment over a clause's words, WITH negation
- * awareness — "I am not happy" must NOT score the same as "I am
- * happy". Uses the same NEGATION_WINDOW proximity rule as mood.js's
- * sentence-level scoring (a negator within a small word-distance flips
- * the sign), just applied at clause granularity. Intentionally lighter
- * than mood.js otherwise: no intensifier/diminisher/contrast weighting
- * here — those already shape the clause boundaries themselves (see
- * splitClauses), so re-applying them here would double-count.
- * @param {string} clauseText
- */
 /**
  * Sums signed lexicon sentiment over a clause's words, WITH negation
  * awareness — "I am not happy" must NOT score the same as "I am
