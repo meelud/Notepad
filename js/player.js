@@ -10,7 +10,7 @@ import { deriveIntentions } from './music/intention.js';
 import { deriveComposition } from './music/composition.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
-import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieQuiz } from './persona.js';
+import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let playing = false;
@@ -444,7 +444,7 @@ export async function play() {
 
   if (completedNaturally) {
     if (isRobbieText(text)) {
-      showRobbieQuiz();
+      showRobbieMessage();
     } else {
       const msg = findPersonaMessage(text);
       if (msg) showPersonaToast(msg);
