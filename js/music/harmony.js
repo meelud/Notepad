@@ -536,7 +536,31 @@ function scoreCandidate(candidate, prev, context) {
   const neighborReturn = (context.neighborReturnDegree != null && note.degree === context.neighborReturnDegree) ? 1 : 0;
 
   const W_NEIGHBOR = context.isStrongBeat ? 0 : 0.5;
-  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment + W_NEIGHBOR * neighborReturn;
+
+  // Item #2 calibration fix (see test/music-eval.mjs): stepwiseNote's own
+  // leapChance already scales with tenseScore (tenser text proposes bigger
+  // leaps as CANDIDATES), but nothing here used to know about tenseScore —
+  // W_VOICE penalized every candidate's leap size by the SAME fixed amount
+  // regardless of context, so a leap proposed BECAUSE of high tension was
+  // penalized exactly as hard as an accidental one and got out-competed by
+  // the small-step candidates in the same pool almost every time. Measured
+  // effect: increasing leapChance's own tenseScore sensitivity made the
+  // corpus-wide tenseScore<->leap-magnitude correlation WORSE, not better
+  // (more strongly negative) — proof the bottleneck was here, not in
+  // stepwiseNote. This axis explicitly rewards leap magnitude in proportion
+  // to tenseScore, counteracting W_VOICE's constant leap-aversion so the
+  // "tenser text leaps more" design intent (documented on stepwiseNote)
+  // actually survives arbitration instead of being cancelled by it.
+  // tenseScore=0 (or omitted) reproduces the exact prior scoring — this is
+  // purely additive. Coefficient chosen empirically via test/music-eval.mjs:
+  // 0.7 is the smallest value giving a clear, real correlation (arbitration-
+  // path r: -0.088 -> +0.211) without measurably eroding step-dominant
+  // motion (corpus-wide step-rate: 46.1% -> 45.8%) or cadence resolution
+  // (unaffected either way, cadence bypasses this scorer entirely).
+  const W_TENSION_LEAP = Math.max(0, context.tenseScore || 0) * 0.7;
+  const leapMagnitude = Math.min(1, Math.abs(note.lastInterval || 0) / 3);
+
+  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment + W_NEIGHBOR * neighborReturn + W_TENSION_LEAP * leapMagnitude;
 }
 
 /**
@@ -570,7 +594,7 @@ function scoreCandidate(candidate, prev, context) {
  */
 export function arbitrateMelodyNote(prev, chordRootDegree, tenseScore, contourBias, isDisruption, isStrongBeat, chordDirection = 0, registerBias = 0, neighborReturnDegree = null, temperature = 0.4) {
   const pool = buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, isDisruption, registerBias, neighborReturnDegree);
-  const scored = pool.map(c => ({ note: c.note, score: scoreCandidate(c, prev, { isStrongBeat, contourBias, isDisruption, chordDirection, neighborReturnDegree }) }));
+  const scored = pool.map(c => ({ note: c.note, score: scoreCandidate(c, prev, { isStrongBeat, contourBias, isDisruption, chordDirection, neighborReturnDegree, tenseScore }) }));
   return arbitrate(scored, temperature);
 }
 
