@@ -543,21 +543,39 @@ function scoreCandidate(candidate, prev, context) {
   // W_VOICE penalized every candidate's leap size by the SAME fixed amount
   // regardless of context, so a leap proposed BECAUSE of high tension was
   // penalized exactly as hard as an accidental one and got out-competed by
-  // the small-step candidates in the same pool almost every time. Measured
-  // effect: increasing leapChance's own tenseScore sensitivity made the
-  // corpus-wide tenseScore<->leap-magnitude correlation WORSE, not better
-  // (more strongly negative) — proof the bottleneck was here, not in
-  // stepwiseNote. This axis explicitly rewards leap magnitude in proportion
-  // to tenseScore, counteracting W_VOICE's constant leap-aversion so the
-  // "tenser text leaps more" design intent (documented on stepwiseNote)
-  // actually survives arbitration instead of being cancelled by it.
+  // the small-step candidates in the same pool almost every time. This axis
+  // explicitly rewards leap magnitude in proportion to tenseScore,
+  // counteracting W_VOICE's constant leap-aversion so the "tenser text
+  // leaps more" design intent (documented on stepwiseNote) actually
+  // survives arbitration instead of being cancelled by it.
   // tenseScore=0 (or omitted) reproduces the exact prior scoring — this is
-  // purely additive. Coefficient chosen empirically via test/music-eval.mjs:
-  // 0.7 is the smallest value giving a clear, real correlation (arbitration-
-  // path r: -0.088 -> +0.211) without measurably eroding step-dominant
-  // motion (corpus-wide step-rate: 46.1% -> 45.8%) or cadence resolution
-  // (unaffected either way, cadence bypasses this scorer entirely).
-  const W_TENSION_LEAP = Math.max(0, context.tenseScore || 0) * 0.7;
+  // purely additive.
+  //
+  // Coefficient history (both rounds measured via test/music-eval.mjs,
+  // recorded here because the first round's conclusion was WRONG and it
+  // matters why): the first calibration pass picked 0.7 using a per-TEXT
+  // correlation test (one mean-leap number vs one tenseScore number per
+  // text, n~100) under an approximate chord-clock simulation and a corpus
+  // skewed 93% toward single-sentence texts. That test showed a promising-
+  // looking jump (arbitration-path r: -0.088 -> +0.211) and was reported
+  // as "confirmed." It wasn't: a later pass added a permutation
+  // significance test and found p=0.56 at that same coefficient — not
+  // distinguishable from chance. The real problem was the unit of
+  // analysis, not the fix: stepwiseNote's leapChance and this axis both
+  // act on a LOCAL per-word tension value that intentionally varies
+  // WITHIN a text via globalTensionBias's arc, so collapsing everything
+  // to one number per text throws away most of the signal and caps
+  // statistical power at corpus size instead of note count. Re-running
+  // the correlation at the correct resolution (one point per arbitration-
+  // path NOTE's local effectiveTense, n in the hundreds) with a real-
+  // time-accurate chord clock and a sentence-count-balanced corpus showed
+  // 0.7 sits at p=0.10 — close but not significant. A coefficient sweep
+  // at this corrected resolution found 1.2 is the smallest value that
+  // clears p<0.05 (r=0.108, p=0.021) while barely moving corpus-wide
+  // step-dominant motion (45.6% -> 45.2%); coefficients above ~1.8 buy
+  // diminishing correlation gains at a real, compounding cost to step-
+  // dominance (down to 41% by coeff=5). 1.2 is used for that reason.
+  const W_TENSION_LEAP = Math.max(0, context.tenseScore || 0) * 1.2;
   const leapMagnitude = Math.min(1, Math.abs(note.lastInterval || 0) / 3);
 
   return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment + W_NEIGHBOR * neighborReturn + W_TENSION_LEAP * leapMagnitude;
