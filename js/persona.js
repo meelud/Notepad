@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "i like your lips. i love your voice. i long to see you",
+    message: "These nights, talking with you, hearing you, feeling you near me — I ride a wave of feeling, untouched by fear or doubt. I hope you know how grateful and happy last night made me."
   },
 ];
 
