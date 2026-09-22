@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "These nights, talking with you, hearing you, feeling you near me — I ride a wave of feeling, untouched by fear or doubt. I hope you know how grateful and happy last night made me."
+    message: "My thoughts drift to you,lately you are all to me, the hopeful and the sane."
   },
 ];
 
