@@ -34,7 +34,7 @@ import { deriveTextHarmony, hashText, resolveCadence, generateMotif,
          motifSequenceStartDegree, motifNote, globalTensionBias,
          arbitrateMelodyNote, chordFromScale, currentScale } from '../js/music/harmony.js';
 import { wordEmotionWeight } from '../js/music/mood.js';
-import { deriveIntentions } from '../js/music/intention.js';
+import { deriveIntentions, deriveSemanticSpans } from '../js/music/intention.js';
 import { deriveComposition } from '../js/music/composition.js';
 import { seedRng, rnd, pick } from '../js/utils/rng.js';
 import { tokenize } from '../js/utils/text.js';
@@ -71,6 +71,7 @@ export function simulateText(text) {
   seedRng(hashText(text));
   const pieceMotif = generateMotif(hashText(text), sessionTenseScore);
   const pieceIntentions = deriveIntentions(text);
+  const pieceSemanticSpans = deriveSemanticSpans(text); // see js/player.js's third phrase-awareness fix
   const pieceComposition = deriveComposition(text);
 
   const tokens = tokenize(text);
@@ -101,6 +102,7 @@ export function simulateText(text) {
   let wordGlobalIndex = 0;
   let clauseCursor = 0;
   let wordIdxInClause = 0;
+  let semanticSpanCursor = 0;
 
   // real elapsed-time chord clock (see module docstring)
   let elapsedMs = 0;
@@ -170,7 +172,14 @@ export function simulateText(text) {
       note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
     } else {
       isStrongBeat = sp.pos % 2 === 1;
-      const semanticWeight = wordEmotionWeight(tok.text);
+      while (semanticSpanCursor < pieceSemanticSpans.length && tok.start >= pieceSemanticSpans[semanticSpanCursor].end) {
+        semanticSpanCursor++;
+      }
+      const spanWeight = pieceSemanticSpans[semanticSpanCursor]
+        && tok.start >= pieceSemanticSpans[semanticSpanCursor].start
+        && tok.start < pieceSemanticSpans[semanticSpanCursor].end
+        ? pieceSemanticSpans[semanticSpanCursor].weight : 0;
+      const semanticWeight = Math.max(wordEmotionWeight(tok.text), spanWeight);
       const isSemanticallyStable = semanticWeight >= SEMANTIC_WEIGHT_THRESHOLD;
       const effChordDeg = (isStrongBeat || isSemanticallyStable) ? chordDeg : null;
       const effectiveTense = Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + compState.tension * 0.25));
