@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "My thoughts drift to you,lately you are all to me, the hopeful and the sane."
+    message: "so i don't know what to write. i'm not so good at talking or writing. i'm the the kinda boy who's better at remembering and who's better at missing you."
   },
 ];
 
