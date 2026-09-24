@@ -30,11 +30,11 @@ const TRIGGERS = [
     words: ['کیانا', 'kiyana', 'kiyanaaa'],
     message: "You’ve named someone dearly loved by the creator. Hopefully she catches me soon.",
   },
-  {
-    topic: 'robbie',
-    words: ['robbie'],
-    message: "so i don't know what to write right now. i'm not so good at talking or writing. i'm the the kinda boy who's better at remembering and who's better at missing you."
-  },
+  #{
+    #topic: 'robbie',
+    #words: ['robbie'],
+    #message: "so i don't know what to write right now. i'm not so good at talking or writing. i'm the the kinda boy who's better at remembering and who's better at missing you."
+  #},
 ];
 
 let toastTimer = null;
