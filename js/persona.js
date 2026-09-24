@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "."
+    message: "Last night, for the first time, I heard you breathe in your sleep. I hate over-explaining anything, except confessing how deeply I care for you.",
   },
 ];
 
@@ -74,7 +74,7 @@ export function showRobbieQuiz() {
   box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
 
   const q = document.createElement('div');
-  q.textContent = "Oct 11, what day's that?";
+  q.textContent = "That first cover you sent — who was singing it?";
   q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
 
   const input = document.createElement('input');
@@ -94,7 +94,7 @@ export function showRobbieQuiz() {
   btn.onclick = () => {
     if (answered) return;
     const v = input.value.trim().toLowerCase();
-    if (v.includes('sunday') || v.includes('sun')) {
+    if (v.includes('mitski')) {
       answered = true;
       input.readOnly = true;
       const robbie = TRIGGERS.find(t => t.topic === 'robbie');
@@ -109,7 +109,7 @@ export function showRobbieQuiz() {
         box.appendChild(done);
       requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
     } else {
-      feedback.textContent = "no, give me the weekday";
+      feedback.textContent = "no, who was it?";
     }
   };
   input.onkeydown = (e) => {

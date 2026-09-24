@@ -6,11 +6,11 @@ import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getChordDirection } from './audio/ambient.js';
 import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote } from './music/harmony.js';
 import { wordEmotionWeight } from './music/mood.js';
-import { deriveIntentions } from './music/intention.js';
+import { deriveIntentions, deriveSemanticSpans } from './music/intention.js';
 import { deriveComposition } from './music/composition.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
-import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
+import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieQuiz } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let playing = false;
@@ -25,6 +25,16 @@ let sessionNormScore = 0; // normScore of the current text, used to nudge reverb
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
 let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
 let pieceComposition = null; // whole-piece section timeline — see music/composition.js
+// Phrase-aware semantic spans (see music/intention.js's deriveSemanticSpans)
+// — the THIRD consumer of the lexicon, alongside clauseSentiment and
+// sectionSentimentMagnitude, and the one most audibly consequential
+// since it drives the live per-word chord-tone pull decision below.
+// wordEmotionWeight(tok.text) alone can only ever see the ~39% of the
+// lexicon that is single-word entries; a word like "top" inside the
+// idiom "on top of the world" scores 0 there and always will. This
+// span list lets the SAME word additionally inherit the weight of
+// whatever multi-word phrase it's actually part of.
+let pieceSemanticSpans = [];
 // Musical Intention layer toggle — flip to false to ignore clause-level
 // semantics (contrast/contour) entirely, reverting to prior behavior.
 const MUSICAL_INTENTION_ENABLED = true;
@@ -138,6 +148,7 @@ export async function play() {
     sessionNormScore = harmonyInfo.normScore;
     pieceMotif = generateMotif(hashText(text), sessionTenseScore);
     pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
+    pieceSemanticSpans = SEMANTIC_STABILITY_ENABLED ? deriveSemanticSpans(text) : [];
     pieceComposition = COMPOSITION_LAYER_ENABLED ? deriveComposition(text) : null;
     harmonyLocked = true;
     lastHarmonyText = text;
@@ -238,6 +249,7 @@ export async function play() {
   let wordGlobalIndex = 0; // 0-based position of this word across the WHOLE text (for global tension arc)
   let clauseCursor = 0;
   let wordIdxInClause = 0;
+  let semanticSpanCursor = 0; // forward-only pointer into pieceSemanticSpans, mirrors clauseCursor's pattern
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
@@ -326,7 +338,23 @@ export async function play() {
         // that clashes with the live harmony. Even word positions stay
         // free passing-tone motion, exactly as before.
         const isStrongBeat = sp.pos % 2 === 1;
-        const semanticWeight = SEMANTIC_STABILITY_ENABLED ? wordEmotionWeight(tok.text) : 0;
+        // phrase-aware semantic weight: take the LARGER of (a) the
+        // existing single-word lookup (kept as-is, zero behavior change
+        // when a word matches no phrase) and (b) the weight of any
+        // multi-word phrase span this word's position falls inside —
+        // see pieceSemanticSpans / deriveSemanticSpans for why this is
+        // needed. Cursor advances forward-only since both tok.start and
+        // pieceSemanticSpans are in increasing text-offset order.
+        while (semanticSpanCursor < pieceSemanticSpans.length && tok.start >= pieceSemanticSpans[semanticSpanCursor].end) {
+          semanticSpanCursor++;
+        }
+        const spanWeight = SEMANTIC_STABILITY_ENABLED
+          && pieceSemanticSpans[semanticSpanCursor]
+          && tok.start >= pieceSemanticSpans[semanticSpanCursor].start
+          && tok.start < pieceSemanticSpans[semanticSpanCursor].end
+          ? pieceSemanticSpans[semanticSpanCursor].weight
+          : 0;
+        const semanticWeight = SEMANTIC_STABILITY_ENABLED ? Math.max(wordEmotionWeight(tok.text), spanWeight) : 0;
         const isSemanticallyStable = semanticWeight >= SEMANTIC_WEIGHT_THRESHOLD;
         const chordDeg = (isStrongBeat || isSemanticallyStable) ? getCurrentChordDegree() : null;
         const effectiveTense = GLOBAL_TENSION_ENABLED
@@ -444,7 +472,7 @@ export async function play() {
 
   if (completedNaturally) {
     if (isRobbieText(text)) {
-      showRobbieMessage();
+      showRobbieQuiz();
     } else {
       const msg = findPersonaMessage(text);
       if (msg) showPersonaToast(msg);

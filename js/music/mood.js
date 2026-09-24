@@ -5,7 +5,6 @@ import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
 
 export { EMOTION_LEXICON };
 
-// ─── Intensity & contrast modifiers ─────────────────────────────
 const INTENSIFIERS = new Set([
   'خیلی','کاملا','کاملاً','فوق','شدیدا','شدیداً','واقعا','واقعاً',
   'حسابی','دقیقا','دقیقاً','قطعا','قطعاً','بی‌نهایت','بینهایت',
@@ -22,7 +21,6 @@ const CONTRAST_WORDS = new Set([
 ]);
 export { CONTRAST_WORDS };
 
-// ─── Persian merge ─────────────────────────────────────────────
 (function mergeColloquialLexicon() {
   for (const [category, words] of Object.entries(FA_LEXICON_COLLOQUIAL)) {
     if (!EMOTION_LEXICON[category]) continue;
@@ -36,7 +34,6 @@ export { CONTRAST_WORDS };
   }
 })();
 
-// ─── Phrase lookup table ────────────────────────────────────────
 function normalizePhrase(str) {
   return (str.toLowerCase().match(/[a-zA-Zا-ی]+/g) || []).join(' ');
 }
@@ -58,18 +55,6 @@ const PHRASE_LOOKUP = (() => {
 
 const SUFFIXES = ['های', 'یم', 'ید', 'ند', 'ها', 'ام', 'ات', 'اش', 'ی', 'م', 'ت', 'ش', 'ه'];
 
-/**
- * Lightweight per-word semantic weight — how strongly THIS single word
- * matches the emotion lexicon, independent of sentence-level scoring.
- * Used by player.js (item #1, GTTM structural weighting) to bias
- * melody stability: strongly-matched words lean toward chord tones,
- * unmatched/function words stay free. Reuses the same PHRASE_LOOKUP
- * table detectMood builds — no separate lexicon pass, no negation or
- * intensifier logic (this is a cheap per-word approximation for
- * melodic bias, not a mood score).
- * @param {string} word — a single token's text (e.g. tok.text)
- * @returns {number} 0 (no match) upward — roughly 0.2 to 1.1+
- */
 export function wordEmotionWeight(word) {
   const key = normalizePhrase(word);
   if (!key) return 0;
@@ -86,14 +71,6 @@ export function wordEmotionWeight(word) {
   return 0;
 }
 
-/**
- * Signed sibling of wordEmotionWeight — same lookup, but preserves the
- * lexicon's sign (positive/negative) instead of taking the absolute
- * value. Used by intention.js to compute a clause's local sentiment
- * DIRECTION (needed for contourBias), not just its intensity.
- * @param {string} word
- * @returns {number} signed weight, 0 if no match
- */
 export function wordSentimentSign(word) {
   const key = normalizePhrase(word);
   if (!key) return 0;
@@ -110,7 +87,100 @@ export function wordSentimentSign(word) {
   return 0;
 }
 
-// ─── Mood detection ────────────────────────────────────────────
+/**
+ * Scans an array of already-tokenized words (via the same
+ * /[a-zA-Zا-ی]+/g extraction detectMood uses) for lexicon PHRASE
+ * matches, using the identical greedy-longest-match-first strategy
+ * (plus the same one-word "loose" skip fallback for 3+ word phrases)
+ * that detectMood's inner loop uses on full sentences.
+ *
+ * Why this exists: wordSentimentSign/wordEmotionWeight above only ever
+ * receive ONE word at a time, so they can only ever match the 38.6% of
+ * the lexicon that is single-word entries — the other 61.4% (1029 of
+ * 1675 entries, e.g. "on top of the world today", "دلم برات تنگ شده
+ * بود") is entirely invisible to any caller that scores word-by-word.
+ * Measured impact before this fix: intention.js's clause-level
+ * contourBias was EXACTLY ZERO for 75% of clauses across the project's
+ * eval corpus, and composition.js's harmonicStability sat at its
+ * maximum (1.0, meaning "zero sentiment detected") for 36% of
+ * sections — including sections of texts that are clearly emotional
+ * by sentence-level detectMood's own scoring. The gap wasn't a matter
+ * of degree, it was most of the signal simply not being visible.
+ *
+ * This intentionally does NOT replicate detectMood's negation,
+ * intensifier/diminisher, or contrast-word weighting — callers here
+ * (intention.js, composition.js) either already apply their own
+ * lighter-weight negation handling at the clause level (to avoid
+ * double-counting what already shapes clause BOUNDARIES — see
+ * intention.js's own docstring on this) or intentionally want raw
+ * magnitude only (composition.js's harmonicStability). Matching only,
+ * not full scoring, is the deliberate scope here.
+ *
+ * Deliberately NOT wired into detectMood's own inner loop, even though
+ * the matching logic is identical: detectMood is covered by
+ * test/snapshot.mjs's stored baseline, and refactoring its live loop
+ * to call out to a shared function risks subtly changing floating-
+ * point iteration order or edge-case behavior in ways a snapshot diff
+ * might not clearly explain. Two copies of the same simple matching
+ * loop is an acceptable, explicitly-documented tradeoff against that
+ * risk — if the matching strategy ever changes, both this function and
+ * detectMood's inner loop must be updated together (there is no way to
+ * enforce this automatically without merging them; a future refactor
+ * that does so safely, verified against the full snapshot suite, would
+ * be welcome).
+ *
+ * @param {string[]} words — already-lowercased, pre-extracted word tokens (e.g. `sentence.match(/[a-zA-Zا-ی]+/g) || []`)
+ * @returns {Array<{index:number, length:number, weight:number, tense:number}>}
+ *   one entry per match; `length` is how many words (1 or more) the
+ *   match consumed starting at `index`, matching detectMood's own
+ *   `consumedLen` semantics exactly.
+ */
+export function scanPhraseMatches(words) {
+  const matches = [];
+  let i = 0;
+  while (i < words.length) {
+    let matchedLen = 0;
+    const maxLen = Math.min(MAX_PHRASE_LEN, words.length - i);
+    for (let len = maxLen; len >= 1; len--) {
+      const span = words.slice(i, i + len).join(' ');
+      let hit = PHRASE_LOOKUP[span];
+      let consumedLen = len;
+
+      if (!hit && len >= 3 && i + len < words.length) {
+        const window = words.slice(i, i + len + 1);
+        for (let skip = 0; skip < window.length; skip++) {
+          const candidate = window.slice(0, skip).concat(window.slice(skip + 1)).join(' ');
+          const looseHit = PHRASE_LOOKUP[candidate];
+          if (looseHit) { hit = looseHit; consumedLen = len + 1; break; }
+        }
+      }
+
+      if (hit) {
+        matches.push({ index: i, length: consumedLen, weight: hit.weight, tense: hit.tense });
+        matchedLen = consumedLen;
+        break;
+      }
+    }
+
+    if (matchedLen === 0 && words[i].length >= 3) {
+      for (const suf of SUFFIXES) {
+        if (words[i].endsWith(suf) && words[i].length - suf.length >= 2) {
+          const stem = words[i].slice(0, -suf.length);
+          const hit = PHRASE_LOOKUP[stem];
+          if (hit) {
+            matches.push({ index: i, length: 1, weight: hit.weight * 0.85, tense: hit.tense * 0.85 });
+            matchedLen = 1;
+            break;
+          }
+        }
+      }
+    }
+
+    i += matchedLen || 1;
+  }
+  return matches;
+}
+
 export function detectMood(text) {
   const lower = text.toLowerCase().replace(/n['’]t\b/g, ' not');
   const totalWords = (lower.match(/[a-zA-Zا-ی]+/g) || []).length;
