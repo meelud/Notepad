@@ -33,7 +33,8 @@ const TRIGGERS = [
   {
     topic: 'robbie',
     words: ['robbie'],
-    message: "Last night, for the first time, I heard you breathe in your sleep. I hate over-explaining anything, except confessing how deeply I care for you.",
+    message: "Last night, for the first time, I could finally hear you breathing beside me.
+I hate over-explaining anything,but confessing how deeply I care for you.",
   },
 ];
 
