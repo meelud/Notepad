@@ -31,11 +31,10 @@ const TRIGGERS = [
     message: "You’ve named someone dearly loved by the creator. Hopefully she catches me soon.",
   },
   {
-    topic: 'robbie',
-    words: ['robbie'],
-    message: "Last night, for the first time, I could finally hear you breathing beside me. I hate over-explaining anything,but confessing how deeply I care for you.",
+  topic: 'robbie',
+  words: ['robbie'],
+  message: "وقتی بیدار میشم یک فحش نثار خورشید می‌کنم و با فکر به تو روزم رو سپری میکنم. مراقب پیرسینگ ناف و لب بالات باش، نیازشون خواهم داشت.",
   },
-];
 
 let toastTimer = null;
 
