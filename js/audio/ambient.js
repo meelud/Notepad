@@ -53,12 +53,27 @@ export function getCurrentChordDegree() { return currentChordRootDegree; }
 let currentChordDirection = 0;
 export function getChordDirection() { return currentChordDirection; }
 
+// Real-time bar-phase (0..1: 0=start of bar, 1=end), for player.js to
+// sync "strong beat" detection to the ACTUAL live rhythm instead of
+// guessing from word-position parity (measured via test/player-sim.mjs:
+// the old word-parity guess landed near a real downbeat only 21.3% of
+// the time — WORSE than the 30% pure chance would give, i.e. it had no
+// real relationship to the beat at all). Set once when the ambient
+// clock starts; read live by player.js's per-word loop.
+let ambientStartTime = null;
+export function getBarPhase() {
+  if (ambientStartTime === null) return 0;
+  const barMs = BEAT_SEC * BAR_BEATS * 1000;
+  return ((performance.now() - ambientStartTime) % barMs) / barMs;
+}
+
 export function clearAmb() {
   ambTimers.forEach(id => clearTimeout(id));
   ambTimers = [];
   clockRunning = false;
   currentChordRootDegree = null;
   currentChordDirection = 0;
+  ambientStartTime = null;
 }
 
 // ─── Ambient clock ──────────────────────────────────────────────
@@ -72,6 +87,7 @@ export function startAmbient(dests, isStopping) {
   const c = ac();
   const rev = getPadSend();
   clockRunning = true;
+  ambientStartTime = performance.now();
   let beat = 0;
   let lastDegree = null;
 
