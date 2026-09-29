@@ -1,6 +1,7 @@
 import { ac } from './context.js';
 import { getReverbNode } from './reverb.js';
-import { rnd, pick } from '../utils/rng.js';
+// timbre randomness lives on the RENDER stream (see utils/rng.js)
+import { rrnd as rnd, rpick as pick } from '../utils/rng.js';
 
 /**
  * 22 synthesizer voice types — each is a function(freq, vol, dur, dests)
