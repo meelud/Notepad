@@ -1,6 +1,8 @@
 import { ac } from './context.js';
 import { getPadSend } from './reverb.js';
-import { rnd, pick } from '../utils/rng.js';
+// the ambient bed's own randomness lives on its OWN stream (utils/rng.js)
+import { arnd as rnd, apick as pick } from '../utils/rng.js';
+import { BEAT_SEC, BEAT_MS, BAR_BEATS, createChordClock } from '../music/rhythm.js';
 import { currentScale, chordFromScale } from '../music/harmony.js';
 
 // ─── State ──────────────────────────────────────────────────────
@@ -8,34 +10,6 @@ let ambTimers = [];
 let clockRunning = false;
 let ambientDensity = 1;
 
-const BEAT_SEC = 1.15;    // seconds per beat (~52 BPM)
-const BAR_BEATS = 4;       // beats per bar (4/4 time)
-const CHORD_DEGREES = [0, 2, 4, 6]; // scale degrees for chord voicing
-
-/**
- * Picks the next chord degree with a preference for smoother motion:
- * never repeats the previous degree, and weights closer degrees more
- * heavily than distant jumps (still allows big leaps sometimes, just
- * less often) — real chord progressions rarely leap around fully at
- * random every bar.
- * @param {number|null} prevDegree
- * @returns {number}
- */
-function pickNextDegree(prevDegree) {
-  if (prevDegree === null) return pick(CHORD_DEGREES);
-  const weights = CHORD_DEGREES.map(d => {
-    if (d === prevDegree) return 0; // never repeat, same as before
-    const dist = Math.abs(d - prevDegree);
-    return 1 / (dist + 0.5);
-  });
-  const total = weights.reduce((a, b) => a + b, 0);
-  let r = rnd(0, total);
-  for (let i = 0; i < CHORD_DEGREES.length; i++) {
-    r -= weights[i];
-    if (r <= 0) return CHORD_DEGREES[i];
-  }
-  return CHORD_DEGREES[CHORD_DEGREES.length - 1];
-}
 
 // ─── Public API ─────────────────────────────────────────────────
 export function setAmbientDensity(v) { ambientDensity = v; }
@@ -53,19 +27,13 @@ export function getCurrentChordDegree() { return currentChordRootDegree; }
 let currentChordDirection = 0;
 export function getChordDirection() { return currentChordDirection; }
 
-// Real-time bar-phase (0..1: 0=start of bar, 1=end), for player.js to
-// sync "strong beat" detection to the ACTUAL live rhythm instead of
-// guessing from word-position parity (measured via test/player-sim.mjs:
-// the old word-parity guess landed near a real downbeat only 21.3% of
-// the time — WORSE than the 30% pure chance would give, i.e. it had no
-// real relationship to the beat at all). Set once when the ambient
-// clock starts; read live by player.js's per-word loop.
+// performance.now() at the moment the ambient clock started. player.js
+// anchors its word schedule to this (ambientStart + virtualMs) so words
+// land on the audible bars. It only positions sounds in time; it is
+// never an input to a musical decision (those use music/rhythm.js's
+// virtual timeline — see there for why).
 let ambientStartTime = null;
-export function getBarPhase() {
-  if (ambientStartTime === null) return 0;
-  const barMs = BEAT_SEC * BAR_BEATS * 1000;
-  return ((performance.now() - ambientStartTime) % barMs) / barMs;
-}
+export function getAmbientStartTime() { return ambientStartTime; }
 
 export function clearAmb() {
   ambTimers.forEach(id => clearTimeout(id));
@@ -82,8 +50,12 @@ export function clearAmb() {
  * Density scales the volume of all ambient layers.
  * @param {AudioNode[]} dests — audio destinations
  * @param {() => boolean} isStopping — callback to check if playback stopped
+ * @param {{degreeAtBar:(n:number)=>number, directionAtBar:(n:number)=>number}} [chordClock]
+ *        deterministic progression from music/rhythm.js's createChordClock;
+ *        the SAME object player.js uses to pick chord tones, so the chord
+ *        the melody assumes is the chord you actually hear.
  */
-export function startAmbient(dests, isStopping) {
+export function startAmbient(dests, isStopping, chordClock = createChordClock(1)) {
   const c = ac();
   const rev = getPadSend();
   clockRunning = true;
@@ -160,9 +132,9 @@ export function startAmbient(dests, isStopping) {
     const barDur = BEAT_SEC * BAR_BEATS;
 
     if (beatInBar === 0) {
-      const prevDegree = lastDegree;
-      let degree = pickNextDegree(lastDegree);
-      currentChordDirection = prevDegree === null ? 0 : Math.sign(degree - prevDegree);
+      const bar = Math.floor(beat / BAR_BEATS);
+      const degree = chordClock.degreeAtBar(bar);
+      currentChordDirection = chordClock.directionAtBar(bar);
       lastDegree = degree;
       currentChordRootDegree = degree;
       playChord(chordFromScale(currentScale, degree), barDur * 1.15);
@@ -176,7 +148,13 @@ export function startAmbient(dests, isStopping) {
     }
 
     beat++;
-    ambTimers.push(setTimeout(tick, BEAT_SEC * 1000));
+    // Drift-corrected: schedule against the ABSOLUTE start time, not
+    // "1.15s after whenever this tick happened to run" — chained
+    // relative timeouts accumulate a few ms per beat (measured minutes
+    // of slip over a long piece), which would slowly pull the audible
+    // bars away from the timeline the words are scheduled on.
+    const nextAt = ambientStartTime + beat * BEAT_MS;
+    ambTimers.push(setTimeout(tick, Math.max(0, nextAt - performance.now())));
   }
 
   tick();

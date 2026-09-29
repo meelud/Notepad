@@ -3,12 +3,15 @@ import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
-import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getChordDirection, getBarPhase } from './audio/ambient.js';
+import { startAmbient, clearAmb, setAmbientDensity, getAmbientStartTime } from './audio/ambient.js';
 import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote } from './music/harmony.js';
 import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions, deriveSemanticSpans } from './music/intention.js';
 import { deriveComposition } from './music/composition.js';
-import { seedRng, rnd, pick } from './utils/rng.js';
+// player.js only draws RENDER randomness (timbre, volume, pan, humanising
+// timing); melodic randomness stays inside harmony.js on the melodic stream.
+import { seedRng, rrnd as rnd, rpick as pick } from './utils/rng.js';
+import { barIndexAt, isStrongBeatAt, punctPauseMs, wordDurationMs, createChordClock } from './music/rhythm.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
 
@@ -210,7 +213,21 @@ export async function play() {
     showPersonaToast("Can't record here, but playback still works — no Save this time.");
   }
 
-  startAmbient(dests, () => stopping);
+  // Deterministic timeline (music/rhythm.js). Every melodic decision below
+  // reads `virtualMs` — the SUM OF PLANNED DURATIONS so far — never the
+  // wall clock, so the same text yields the same notes however the real
+  // timers jitter. Real time only decides WHEN a planned event is heard:
+  // each word is scheduled at (ambient start + virtualMs).
+  const chordClock = createChordClock(hashText(text));
+  startAmbient(dests, () => stopping, chordClock);
+  let timelineOrigin = getAmbientStartTime() ?? performance.now();
+  let virtualMs = 0;
+  const MAX_LAG_MS = 1500;
+  const waitUntilVirtual = async (targetMs) => {
+    const delay = timelineOrigin + targetMs - performance.now();
+    if (delay < -MAX_LAG_MS) timelineOrigin -= delay; // long stall (e.g. throttled tab): re-anchor instead of firing a burst of catch-up words
+    await sleep(Math.max(0, delay));
+  };
 
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
@@ -259,15 +276,13 @@ export async function play() {
     render.innerHTML = buildRender(text, tok.start, tok.end);
 
     if (tok.type === 'punct') {
+      // Advance the virtual clock BEFORE anything that can throw, so a
+      // failed playPunctuation can't desynchronise the timeline.
+      // Pause lengths: music/rhythm.js punctPauseMs.
+      virtualMs += punctPauseMs(tok.text);
       const intensity = 0.7 + 0.3;
       playPunctuation(tok.text, dests, intensity);
-      // pause durations (ms): period=420, question=380, exclaim=340, comma=200, other=150
-      const pause = (tok.text === '.') ? 420
-                  : (tok.text === '?' || tok.text === '؟') ? 380
-                  : (tok.text === '!') ? 340
-                  : (tok.text === ',' || tok.text === '،') ? 200
-                  : 150;
-      await sleep(pause);
+      await waitUntilVirtual(virtualMs);
       continue;
     }
 
@@ -290,6 +305,13 @@ export async function play() {
     // sentence position (must be computed before the melody contour
     // block below, which reads sp.pos to detect a new sentence)
     const sp = sentencePos[i] || { pos: 1, total: 1 };
+
+    // This word's slot on the deterministic timeline. Fixed here, before
+    // any code that can throw, so an error mid-word can't shift later
+    // words' beat/chord positions.
+    const wordStartMs = virtualMs;
+    virtualMs += wordDurationMs(wlen, sessionTenseScore, isCadence);
+    const wordEndMs = virtualMs;
 
     if (sp.pos === 1) {
       // new sentence: decide whether it restates the piece's motif
@@ -330,23 +352,16 @@ export async function play() {
       } else if (motifAllowed && sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
         note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
       } else {
-        // Harmonic awareness: on odd word positions within the sentence
-        // (a simple downbeat proxy — true beat-grid sync is a separate,
-        // higher-risk item on the roadmap), pull the note onto the
-        // nearest tone of whatever chord ambient.js is currently
-        // sounding, so it doesn't land on an arbitrary scale degree
-        // that clashes with the live harmony. Even word positions stay
-        // free passing-tone motion, exactly as before.
-        // Real-time downbeat detection (FIXED — see audio/ambient.js's
-        // getBarPhase docstring): word-position parity used to stand in
-        // for "is this a strong beat", measured to land near a real
-        // downbeat only 21.3% of the time (worse than 30% pure chance —
-        // no real relationship to the beat at all). Now reads the live
-        // bar phase from the same clock ambient.js's chords/pulses
-        // actually follow, so "strong beat" words are genuinely aligned
-        // with the audible rhythm underneath them.
-        const barPhase = getBarPhase();
-        const isStrongBeat = barPhase < 0.15 || barPhase >= 0.85;
+        // Strong-beat detection reads the piece's DETERMINISTIC bar
+        // phase at this word's planned onset (music/rhythm.js), not
+        // word-position parity and not the live clock. Parity landed
+        // near a real downbeat only 21.3% of the time (worse than the
+        // 30% chance level); reading performance.now() fixed that but
+        // made the notes depend on real timer jitter. The virtual
+        // timeline gives the same beat alignment, reproducibly, and
+        // ambient.js plays its bars on that same timeline.
+        const barIdx = barIndexAt(wordStartMs);
+        const isStrongBeat = isStrongBeatAt(wordStartMs);
         // phrase-aware semantic weight: take the LARGER of (a) the
         // existing single-word lookup (kept as-is, zero behavior change
         // when a word matches no phrase) and (b) the weight of any
@@ -365,7 +380,7 @@ export async function play() {
           : 0;
         const semanticWeight = SEMANTIC_STABILITY_ENABLED ? Math.max(wordEmotionWeight(tok.text), spanWeight) : 0;
         const isSemanticallyStable = semanticWeight >= SEMANTIC_WEIGHT_THRESHOLD;
-        const chordDeg = (isStrongBeat || isSemanticallyStable) ? getCurrentChordDegree() : null;
+        const chordDeg = (isStrongBeat || isSemanticallyStable) ? chordClock.degreeAtBar(barIdx) : null;
         const effectiveTense = GLOBAL_TENSION_ENABLED
           ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + (compState ? compState.tension * 0.25 : 0)))
           : sessionTenseScore;
@@ -384,7 +399,7 @@ export async function play() {
           intention.contourBias,
           isDisruptionNow,
           isStrongBeat,
-          CONTRARY_MOTION_ENABLED ? getChordDirection() : 0,
+          CONTRARY_MOTION_ENABLED ? chordClock.directionAtBar(barIdx) : 0,
           combinedRegisterBias,
           NEIGHBOR_TONE_ENABLED ? pendingNeighborTarget?.degree : null
         );
@@ -443,17 +458,16 @@ export async function play() {
     }
     VOICES[voiceIdx](freq, vol, dur, [panner]);
 
-    // word-length → timing: base 380ms + 42ms per letter, no cap —
-    // longer words genuinely get more time instead of being clipped.
-    // A small, clamped nudge from the text's overall tenseScore layers
-    // on top: tense/urgent text reads a little faster, calm text a
-    // little slower — capped at ±15% so it stays a subtle emotional
-    // cue, not a dramatic tempo swing.
-    const clampedTense = Math.max(-0.5, Math.min(1.0, sessionTenseScore));
-    const pacingFactor = 1 - clampedTense * 0.15;
-    const base = (380 + wlen * 42) * pacingFactor;
-    const spd  = (isCadence ? base * 1.2 : base) + rnd(-20, 60);
-    await sleep(spd);
+    // word-length → timing: planned by music/rhythm.js wordDurationMs
+    // (base 380ms + 42ms per letter, ±15% tempo nudge from the text's
+    // tenseScore, cadence words 20% longer). The word after this one is
+    // heard at (timeline origin + its planned onset) plus a small
+    // humanising offset. The offset does not accumulate (each onset is
+    // jittered around the plan, not around the previous onset), so it
+    // can't drift the words away from the bars; ±28ms keeps the
+    // spread between consecutive onsets at the ~23ms the old
+    // cumulative rnd(-20,60) had.
+    await waitUntilVirtual(wordEndMs + rnd(-28, 28));
     } catch (err) {
       // A failure synthesizing/scheduling this one word must not kill the
       // whole loop — previously an uncaught error here silently stopped
