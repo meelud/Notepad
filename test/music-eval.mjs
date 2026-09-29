@@ -43,7 +43,8 @@
  * Usage: node test/music-eval.mjs
  */
 import { simulateText } from './player-sim.mjs';
-import { EVAL_DATASET, LONG_TEXTS } from './eval-dataset.mjs';
+import { EVAL_DATASET } from './eval-dataset.mjs';
+import { LONG_TEXTS } from './eval-dataset-with-long-texts.mjs';
 import { MODE_OFFSETS } from '../js/music/scales.js';
 
 const CORPUS = [...EVAL_DATASET.map(([t]) => t), ...LONG_TEXTS];

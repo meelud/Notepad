@@ -1,4 +1,4 @@
-import { deriveIntentions } from './intention.js';
+import { deriveIntentions } from '../js/music/intention.js';
 
 let fails = 0;
 function check(name, cond, detail = '') {
