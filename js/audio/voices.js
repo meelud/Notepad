@@ -210,7 +210,7 @@ export const VOICES = [
     const swell = Math.max(dur*1.6, 0.8);
     [-5,0,5,12].forEach(det => {
       const osc = c.createOscillator(), g = c.createGain();
-      const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=freq*2; bp.Q.value=1.5;
+      const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.5;
       bp.frequency.setValueAtTime(freq*1.5, c.currentTime);
       bp.frequency.linearRampToValueAtTime(freq*2.5, c.currentTime+swell);
       osc.type='sawtooth'; osc.frequency.value=freq; osc.detune.value=det;
@@ -296,14 +296,24 @@ export const VOICES = [
   },
 
   // 18 — Synth brass swell
+  //
+  // Fix: the lowpass sweep used to run from a fixed 300Hz up to freq*5.
+  // For bass notes, freq*5 can fall below 300Hz, which silently inverted
+  // the sweep (filter closing instead of opening) — the opposite of the
+  // intended "swell" character. The sweep now always starts at a fixed
+  // fraction of the target (freq*5*0.12) and opens up to freq*5, so the
+  // direction is guaranteed upward regardless of the note's pitch. The
+  // audible brightening curve for mid/treble notes is unchanged; only
+  // bass notes now swell correctly instead of inverting.
   (freq, vol, dur, dests) => {
     const c = ac(); const rev = getReverbNode();
     const swell = Math.max(dur*1.2, 0.4);
     [-4,4].forEach(det => {
       const osc = c.createOscillator(), g = c.createGain();
       const lp = c.createBiquadFilter(); lp.type='lowpass';
-      lp.frequency.setValueAtTime(300, c.currentTime);
-      lp.frequency.linearRampToValueAtTime(freq*5, c.currentTime+swell*0.4);
+      const target = freq*5;
+      lp.frequency.setValueAtTime(target*0.12, c.currentTime);
+      lp.frequency.linearRampToValueAtTime(target, c.currentTime+swell*0.4);
       osc.type='sawtooth'; osc.frequency.value=freq; osc.detune.value=det;
       g.gain.setValueAtTime(0, c.currentTime);
       g.gain.linearRampToValueAtTime(vol*0.3, c.currentTime+swell*0.3);

@@ -71,17 +71,32 @@ test/
 2. `harmony.js` maps that sentiment onto one of 16 dark→bright musical
    modes and picks a root frequency, seeded deterministically from the
    text's hash (same text always produces the same key).
-3. `player.js` tokenizes the text and, word by word: picks a pitch
-   from the current scale, a voice (biased by sentence type AND mood —
-   dark text leans toward airier/deeper voices, bright text toward
-   bell-like/playful ones), shapes volume with a per-sentence arc and
-   end-of-sentence cadence softening, pans it in stereo, and paces
-   timing by word length and the text's overall tension.
-4. `ambient.js` runs an independent background clock (pads, bass
-   pulse, occasional motif notes) with smooth chord voice-leading.
-5. `reverb.js` sets the wet/dry mix once per playback based on the
-   text's mood — sadder/darker text gets more spacious reverb, bright
-   text stays drier.
+3. **Melodic contour** (`harmony.js: nextMelodyNote`): each word's
+   pitch is a real step from the *previous* note — degree and octave
+   tracked separately, wrapped (not clamped) so the line stays
+   continuous — instead of an independent random pick per word. Leap
+   probability/size scale with the text's tension (calmer text moves
+   in smaller steps, tense text leaps more). A new sentence starts a
+   fresh phrase near the root; a sentence's last word resolves
+   stepwise back toward the root degree as a real cadence.
+4. `player.js` tokenizes the text and, word by word: gets its pitch
+   from the contour above, a voice (biased by sentence type, mood, AND
+   attack-family — see below), shapes volume with a per-sentence arc
+   and end-of-sentence cadence softening, paces timing by word length
+   and the text's overall tension, and pans it in stereo.
+5. **Voice orchestration**: voices are classified by their actual
+   envelope behavior (percussive/instant-attack vs. ramped/swelling —
+   extracted from real code, not descriptive comments) in addition to
+   mood (dark/bright). Each *sentence* locks into one attack-family so
+   voice changes within it stay coherent; only cadence words may cross
+   into the opposite family, as a deliberate resolution gesture.
+6. `ambient.js` runs an independent background clock (pads, bass
+   pulse, occasional motif notes) with smooth chord voice-leading
+   (weighted toward nearby scale degrees, never repeating the last).
+7. `reverb.js` updates continuously during playback — wet/dry mix
+   responds to mood (sadder/darker → more spacious), text density
+   (sparser passages sit further back), and energy (from tenseScore),
+   not just a single value set once per session.
 
 ## Testing
 
@@ -99,10 +114,6 @@ the baseline only when the behavior change is intentional.
 
 ## Known limitations (honest, not hidden)
 
-- **No melodic contour.** Each word's pitch is picked independently at
-  random from the current scale — no relationship to the previous
-  note. This is the single biggest remaining lever for music quality,
-  intentionally not yet implemented (raised and paused twice).
 - **Sentiment detection is a heuristic, not a trained model.**
   Word/phrase-weight lexicon + hand-written rules. Measured at ~95%
   within-one-bucket agreement against a small hand-labeled evaluation

@@ -116,6 +116,30 @@ export function computeReverbProfile({ normScore = 0, density = 1, energy = 0.5 
   };
 }
 
+// ─── Register-aware reverb ───────────────────────────────────────
+/**
+ * Maps a note's frequency to a reverb send multiplier.
+ * In real rooms, low-frequency notes excite more room modes and create
+ * more reverberant energy; high-frequency notes are more directional
+ * and create less. This models that behavior as a smooth, continuous
+ * function of frequency — a single multiplier applied to all three
+ * role sends (lead/pad/fx) per-note. The reverb's spectral character
+ * (IR shape, damping) stays fixed; only how much each note feeds the
+ * shared space changes. This is the simplest, safest way to achieve
+ * register-aware reverb in a single-instance system.
+ * @param {number} freq — note frequency in Hz
+ * @returns {number} multiplier ≈ 0.80 (high treble) .. 1.20 (low bass)
+ */
+export function registerModifier(freq) {
+  if (!Number.isFinite(freq) || freq <= 0) return 1.0;
+  const logRatio = Math.log2(freq / 440); // semitones from A4
+  // Bass (negative logRatio) sends more to reverb (excites room modes);
+  // treble (positive logRatio) sends less (stays more direct/present).
+  // ±0.08 per octave gives a ±20% range over ~2.5 octaves each way —
+  // subtle enough to be natural, strong enough to be audible.
+  return clamp(1.0 - logRatio * 0.08, 0.80, 1.20);
+}
+
 // ─── Impulse response synthesis ──────────────────────────────────
 /**
  * Synthesizes a mono impulse response for a room defined by a profile.

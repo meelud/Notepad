@@ -3,11 +3,14 @@ import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
-import { startAmbient, clearAmb, setAmbientDensity } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, wordNoteScale, currentScale } from './music/harmony.js';
+import { startAmbient, clearAmb, setAmbientDensity, getCurrentChordDegree, getChordDirection, getBarPhase } from './audio/ambient.js';
+import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote } from './music/harmony.js';
+import { wordEmotionWeight } from './music/mood.js';
+import { deriveIntentions, deriveSemanticSpans } from './music/intention.js';
+import { deriveComposition } from './music/composition.js';
 import { seedRng, rnd, pick } from './utils/rng.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
-import { findPersonaMessage, showPersonaToast } from './persona.js';
+import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
 let playing = false;
@@ -16,11 +19,45 @@ let rec = null;
 let chunks = [];
 let audioBlob = null;
 let harmonyLocked = false;
+let lastHarmonyText = null; // the text harmonyLocked was derived from — auto-invalidates the lock if the text changes
 let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
+let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
+let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
+let pieceComposition = null; // whole-piece section timeline — see music/composition.js
+// Phrase-aware semantic spans (see music/intention.js's deriveSemanticSpans)
+// — the THIRD consumer of the lexicon, alongside clauseSentiment and
+// sectionSentimentMagnitude, and the one most audibly consequential
+// since it drives the live per-word chord-tone pull decision below.
+// wordEmotionWeight(tok.text) alone can only ever see the ~39% of the
+// lexicon that is single-word entries; a word like "top" inside the
+// idiom "on top of the world" scores 0 there and always will. This
+// span list lets the SAME word additionally inherit the weight of
+// whatever multi-word phrase it's actually part of.
+let pieceSemanticSpans = [];
+// Musical Intention layer toggle — flip to false to ignore clause-level
+// semantics (contrast/contour) entirely, reverting to prior behavior.
+const MUSICAL_INTENTION_ENABLED = true;
+const REGISTER_BIAS_ENABLED = true;
+const NEIGHBOR_TONE_ENABLED = true;
+// Composition Layer toggle — flip to false to ignore the whole-piece
+// section timeline entirely, reverting to per-sentence-only behavior.
+const COMPOSITION_LAYER_ENABLED = true;
+
+// Item #3 (global tension profile) toggle — flip to false to instantly
+// revert to pure per-sentence tenseScore for A/B comparison.
+const GLOBAL_TENSION_ENABLED = true;
+// Item #2 (contrary motion vs chord movement) toggle — flip to false to
+// revert harmonizeNote calls to plain nearest-tone voice leading only.
+const CONTRARY_MOTION_ENABLED = true;
+// Item #1 (GTTM-style structural weighting) toggle — flip to false to
+// revert to strong-beat-only harmonization, ignoring word semantics.
+const SEMANTIC_STABILITY_ENABLED = true;
+const SEMANTIC_WEIGHT_THRESHOLD = 0.5; // lexicon match strength that earns chord-tone pull on an otherwise-free (weak) beat
 
 export function isPlaying() { return playing; }
 export function getAudioBlob() { return audioBlob; }
+export function getAudioMimeType() { return rec && rec.mimeType ? rec.mimeType : 'audio/webm'; }
 
 // ─── Voice selection by sentence type ───────────────────────────
 const VOICE_GROUPS = {
@@ -94,11 +131,27 @@ export async function play() {
 
   unlockIOSAudio();
 
+  // A locked harmony is only valid for the text it was derived from —
+  // if the editor's content has changed since then (typed new text and
+  // hit Play without clicking Clear), the lock must NOT carry over, or
+  // every subsequent piece silently reuses the first text's mode/
+  // scale/motif/intentions regardless of what the new text actually
+  // says. Clear() still works as an explicit reset; this just makes
+  // editing-then-replaying also behave correctly without relying on it.
+  if (harmonyLocked && text !== lastHarmonyText) {
+    harmonyLocked = false;
+  }
+
   if (!harmonyLocked) {
     const harmonyInfo = deriveTextHarmony(text);
     sessionTenseScore = harmonyInfo.tenseScore;
     sessionNormScore = harmonyInfo.normScore;
+    pieceMotif = generateMotif(hashText(text), sessionTenseScore);
+    pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
+    pieceSemanticSpans = SEMANTIC_STABILITY_ENABLED ? deriveSemanticSpans(text) : [];
+    pieceComposition = COMPOSITION_LAYER_ENABLED ? deriveComposition(text) : null;
     harmonyLocked = true;
+    lastHarmonyText = text;
   }
 
   seedRng(hashText(text));
@@ -161,6 +214,7 @@ export async function play() {
 
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
+  const totalWordsInText = playable.filter(t => t.type === 'word').length;
 
   // sentence-position map: for each word token's index in `playable`,
   // record its 1-based position and the total word count of its
@@ -186,10 +240,21 @@ export async function play() {
 
   let currentFamily = familyForMood(sessionNormScore);
   let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily);
+  let lastNote = null; // melodic contour state: {degree, octave, lastInterval} — persists across sentences for register continuity
+  let sentenceCycle = 0;       // 1-based count of sentences seen so far
+  let wordIdxInSentence = 0;   // 0-based position of the current word within its sentence
+  let pendingNeighborTarget = null; // {degree} — set after a weak-beat step-away, offers a return bonus on the NEXT weak-beat note (neighbor tone pattern)
+  let sentenceUsesMotif = false;
+  let sentenceStartDegree = 0;
+  let wordGlobalIndex = 0; // 0-based position of this word across the WHOLE text (for global tension arc)
+  let clauseCursor = 0;
+  let wordIdxInClause = 0;
+  let semanticSpanCursor = 0; // forward-only pointer into pieceSemanticSpans, mirrors clauseCursor's pattern
 
   for (let i = 0; i < playable.length; i++) {
     if (stopping) break;
     const tok = playable[i];
+    try {
 
     render.innerHTML = buildRender(text, tok.start, tok.end);
 
@@ -222,12 +287,127 @@ export async function play() {
     const next = playable[i + 1];
     const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
 
-    const freq = pick(wordNoteScale());
+    // sentence position (must be computed before the melody contour
+    // block below, which reads sp.pos to detect a new sentence)
+    const sp = sentencePos[i] || { pos: 1, total: 1 };
+
+    if (sp.pos === 1) {
+      // new sentence: decide whether it restates the piece's motif
+      // (odd-numbered sentences: 1st, 3rd, 5th...) as a rising sequence,
+      // or moves freely (even-numbered) — periodic recurrence rather
+      // than either constant repetition or pure randomness every time
+      sentenceCycle++;
+      wordIdxInSentence = 0;
+      sentenceUsesMotif = (sentenceCycle % 2 === 1);
+      if (sentenceUsesMotif) {
+        const occurrenceIdx = Math.floor((sentenceCycle - 1) / 2);
+        sentenceStartDegree = motifSequenceStartDegree(occurrenceIdx);
+      }
+    }
+
+    // advance the clause cursor so it always points at the clause
+    // containing this word (both arrays are in text order, so a simple
+    // forward-only pointer is enough — no need to search from scratch)
+    while (clauseCursor < pieceIntentions.length - 1 && tok.start >= pieceIntentions[clauseCursor].end) {
+      clauseCursor++;
+      wordIdxInClause = 0;
+    }
+    const intention = pieceIntentions[clauseCursor] || { contourBias: 0, isDisruption: false, cadenceStrength: 1 };
+    const isFirstWordOfClause = wordIdxInClause === 0;
+    wordIdxInClause++;
+
+    const freq = (() => {
+      let note;
+      const progress = totalWordsInText > 1 ? wordGlobalIndex / (totalWordsInText - 1) : 0;
+      const compState = COMPOSITION_LAYER_ENABLED && pieceComposition ? pieceComposition.getStateAt(progress) : null;
+      const combinedRegisterBias = REGISTER_BIAS_ENABLED
+        ? Math.max(-1, Math.min(1, intention.contourBias + (compState ? compState.registerTendency * 0.5 : 0)))
+        : 0;
+      const motifAllowed = compState ? compState.motifActive : true;
+
+      if (isCadence) {
+        note = resolveCadence(lastNote, tok.sentenceType, intention.cadenceStrength, combinedRegisterBias);
+      } else if (motifAllowed && sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
+        note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
+      } else {
+        // Harmonic awareness: on odd word positions within the sentence
+        // (a simple downbeat proxy — true beat-grid sync is a separate,
+        // higher-risk item on the roadmap), pull the note onto the
+        // nearest tone of whatever chord ambient.js is currently
+        // sounding, so it doesn't land on an arbitrary scale degree
+        // that clashes with the live harmony. Even word positions stay
+        // free passing-tone motion, exactly as before.
+        // Real-time downbeat detection (FIXED — see audio/ambient.js's
+        // getBarPhase docstring): word-position parity used to stand in
+        // for "is this a strong beat", measured to land near a real
+        // downbeat only 21.3% of the time (worse than 30% pure chance —
+        // no real relationship to the beat at all). Now reads the live
+        // bar phase from the same clock ambient.js's chords/pulses
+        // actually follow, so "strong beat" words are genuinely aligned
+        // with the audible rhythm underneath them.
+        const barPhase = getBarPhase();
+        const isStrongBeat = barPhase < 0.15 || barPhase >= 0.85;
+        // phrase-aware semantic weight: take the LARGER of (a) the
+        // existing single-word lookup (kept as-is, zero behavior change
+        // when a word matches no phrase) and (b) the weight of any
+        // multi-word phrase span this word's position falls inside —
+        // see pieceSemanticSpans / deriveSemanticSpans for why this is
+        // needed. Cursor advances forward-only since both tok.start and
+        // pieceSemanticSpans are in increasing text-offset order.
+        while (semanticSpanCursor < pieceSemanticSpans.length && tok.start >= pieceSemanticSpans[semanticSpanCursor].end) {
+          semanticSpanCursor++;
+        }
+        const spanWeight = SEMANTIC_STABILITY_ENABLED
+          && pieceSemanticSpans[semanticSpanCursor]
+          && tok.start >= pieceSemanticSpans[semanticSpanCursor].start
+          && tok.start < pieceSemanticSpans[semanticSpanCursor].end
+          ? pieceSemanticSpans[semanticSpanCursor].weight
+          : 0;
+        const semanticWeight = SEMANTIC_STABILITY_ENABLED ? Math.max(wordEmotionWeight(tok.text), spanWeight) : 0;
+        const isSemanticallyStable = semanticWeight >= SEMANTIC_WEIGHT_THRESHOLD;
+        const chordDeg = (isStrongBeat || isSemanticallyStable) ? getCurrentChordDegree() : null;
+        const effectiveTense = GLOBAL_TENSION_ENABLED
+          ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + (compState ? compState.tension * 0.25 : 0)))
+          : sessionTenseScore;
+        // Tier 2 arbitration: harmony's chord-tone pull, semantic/
+        // tension-driven motion, and plain voice-leading all compete
+        // as scored candidates from a real pool (see harmony.js's
+        // arbitrateMelodyNote) — not two pre-decided "winners" combined
+        // by a single ad hoc weight. Cadence/motif above stay hard
+        // overrides on purpose (Tier 1 — see arbitrate's docstring).
+        const isDisruptionNow = intention.isDisruption && isFirstWordOfClause;
+        const prevDegreeBeforeThisNote = lastNote ? lastNote.degree : null;
+        note = arbitrateMelodyNote(
+          lastNote,
+          chordDeg,
+          effectiveTense,
+          intention.contourBias,
+          isDisruptionNow,
+          isStrongBeat,
+          CONTRARY_MOTION_ENABLED ? getChordDirection() : 0,
+          combinedRegisterBias,
+          NEIGHBOR_TONE_ENABLED ? pendingNeighborTarget?.degree : null
+        );
+        // neighbor-tone bookkeeping: any pending return offer is consumed
+        // (used or not) after one word, so its influence stays local;
+        // a fresh offer is set only on a genuine weak-beat single step
+        // away from the previous note — the classic "leave, then return"
+        // shape, not every note (which would just be noise).
+        pendingNeighborTarget = null;
+        if (NEIGHBOR_TONE_ENABLED && !isStrongBeat && !isCadence && prevDegreeBeforeThisNote !== null
+            && Math.abs(note.lastInterval || 0) === 1) {
+          pendingNeighborTarget = { degree: prevDegreeBeforeThisNote };
+        }
+      }
+      lastNote = note;
+      wordIdxInSentence++;
+      wordGlobalIndex++;
+      return note.freq;
+    })();
 
     // gentle volume arc across the sentence: quieter near the edges,
     // fuller in the middle — real phrasing breathes, it doesn't hold
     // one flat loudness word to word. Sin-shaped, ±15%, clamped.
-    const sp = sentencePos[i] || { pos: 1, total: 1 };
     const frac = sp.total > 1 ? (sp.pos - 1) / (sp.total - 1) : 0.5;
     const volArc = 0.85 + Math.sin(Math.PI * frac) * 0.3;
 
@@ -274,6 +454,14 @@ export async function play() {
     const base = (380 + wlen * 42) * pacingFactor;
     const spd  = (isCadence ? base * 1.2 : base) + rnd(-20, 60);
     await sleep(spd);
+    } catch (err) {
+      // A failure synthesizing/scheduling this one word must not kill the
+      // whole loop — previously an uncaught error here silently stopped
+      // playback after the first word while startAmbient()'s independent
+      // setTimeout clock kept running forever with no cleanup (clearAmb()
+      // is only called after the loop finishes normally or via stop()).
+      console.error('Notepad: error playing word, skipping to next', tok?.text, err);
+    }
   }
 
   const completedNaturally = !stopping;
@@ -292,8 +480,12 @@ export async function play() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
 
   if (completedNaturally) {
-    const msg = findPersonaMessage(text);
-    if (msg) showPersonaToast(msg);
+    if (isRobbieText(text)) {
+      showRobbieMessage();
+    } else {
+      const msg = findPersonaMessage(text);
+      if (msg) showPersonaToast(msg);
+    }
   }
 }
 
@@ -311,6 +503,7 @@ export function stop() {
 // ─── Reset helpers ──────────────────────────────────────────────
 export function resetHarmony() {
   harmonyLocked = false;
+  lastHarmonyText = null;
   sessionTenseScore = 0;
   sessionNormScore = 0;
 }

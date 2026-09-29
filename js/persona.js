@@ -25,6 +25,16 @@ const TRIGGERS = [
     words: ['lily', 'lilly', 'lilum', 'لیلی', 'لیلیوم'],
     message: "You're on about something I used to have — it had the most beautiful look and smell you could imagine. Please take care of it.",
   },
+  {
+    topic: 'kiyana',
+    words: ['کیانا', 'kiyana', 'kiyanaaa'],
+    message: "You’ve named someone dearly loved by the creator. Hopefully she catches me soon.",
+  },
+  {
+  topic: 'robbie',
+  words: ['robbie'],
+  message: "I am thankful that there is someone like you.",
+  },
 ];
 
 let toastTimer = null;
@@ -45,14 +55,123 @@ export function findPersonaMessage(text) {
   return pick.message;
 }
 
+export function isRobbieText(text) {
+  return text.toLowerCase().includes('robbie');
+}
+
+// ─── Robbie quiz ────────────────────────────────────────────────
+// Additive easter-egg: instead of a plain toast, Robbie gets a
+// question + answer box. Correct answer ("sunday") reveals the
+// robbie message; wrong answer nudges her to tell the weekday.
+export function showRobbieQuiz() {
+  document.getElementById('robbie-quiz')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'robbie-quiz';
+  overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:50;padding:20px;box-sizing:border-box;';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:420px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
+
+  const q = document.createElement('div');
+  q.textContent = "That first cover you sent, who was singing it?";
+  q.style.cssText = 'color:#e8e2d6;font-size:19px;line-height:1.6;margin-bottom:18px;';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.style.cssText = 'display:block;width:100%;max-width:240px;margin:8px auto 0;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid rgba(196,168,108,0.35);border-radius:0;color:#e8e2d6;font-family:"EB Garamond",serif;font-size:19px;letter-spacing:0.08em;padding:6px 4px;outline:none;text-align:center;';
+
+  const btn = document.createElement('button');
+  btn.textContent = 'send';
+  btn.style.cssText = 'margin-top:10px;background:none;border:none;font-family:Inter,sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#a48a52;cursor:pointer;padding:6px 12px;opacity:0.8;';
+
+  const feedback = document.createElement('div');
+  feedback.style.cssText = 'min-height:28px;margin-top:112px;color:#e8e2d6;font-family:"EB Garamond",serif;font-size:18px;font-style:normal;';
+
+  let answered = false;
+  btn.onclick = () => {
+    if (answered) return;
+    const v = input.value.trim().toLowerCase();
+    if (v.includes('mitski')) {
+      answered = true;
+      input.readOnly = true;
+      const robbie = TRIGGERS.find(t => t.topic === 'robbie');
+      box.innerHTML = '';
+      box.style.maxWidth = '600px';
+        const done = document.createElement('div');
+        done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:18px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
+        const cap = document.createElement('div');
+        cap.textContent = robbie ? robbie.message : 'sunday';
+        done.append(cap);
+        done.onclick = () => overlay.remove();
+        box.appendChild(done);
+      requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
+    } else {
+      feedback.textContent = "no, who was it?";
+    }
+  };
+  input.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') btn.click();
+  };
+
+  box.append(q, input, btn, feedback);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  input.focus();
+}
+
 /**
  * Shows the toast with the given message, then fades it out after a
  * few seconds. Safe to call repeatedly — resets its own timer.
  * @param {string} message
  */
-export function showPersonaToast(message) {
+export function showRobbieMessage() {
+  document.getElementById('robbie-quiz')?.remove();
+  const robbie = TRIGGERS.find(t => t.topic === 'robbie');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'robbie-quiz';
+  overlay.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);z-index:50;padding:20px;box-sizing:border-box;';
+
+  const box = document.createElement('div');
+  box.style.cssText = 'background:transparent;border:none;padding:24px 22px;width:100%;max-width:600px;box-sizing:border-box;text-align:center;font-family:"EB Garamond",serif;';
+
+  const done = document.createElement('div');
+  done.style.cssText = 'color:#e8e2d6;background:rgba(20,20,18,0.92);border:1px solid rgba(196,168,108,0.25);border-radius:5px;font-family:"EB Garamond",Georgia,serif;font-size:18px;line-height:1.8;text-align:center;padding:22px 26px;box-sizing:border-box;cursor:pointer;opacity:0;transition:opacity 1.6s ease;';
+  const cap = document.createElement('div');
+  cap.textContent = robbie ? robbie.message : '';
+  done.append(cap);
+  done.onclick = () => overlay.remove();
+  box.appendChild(done);
+  overlay.appendChild(box);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => requestAnimationFrame(() => { done.style.opacity = '1'; }));
+}
+
+export function showPersonaToast(message, big = false) {
   if (!toast) return;
   clearTimeout(toastTimer);
+  if (big) {
+    const isMobile = window.innerWidth <= 480;
+    toast.style.fontSize = isMobile ? '13px' : '17px';
+    toast.style.lineHeight = isMobile ? '1.6' : '1.8';
+    toast.style.bottom = '140px';
+    toast.style.padding = isMobile ? '12px 10px' : '16px 16px';
+    toast.style.maxWidth = '96vw';
+    toast.style.width = 'max-content';
+  } else {
+    toast.style.fontSize = '';
+    toast.style.lineHeight = '';
+    toast.style.bottom = '';
+    toast.style.padding = '';
+    toast.style.maxWidth = '';
+    toast.style.width = '';
+  }
   toast.textContent = message;
   // force reflow so re-triggering restarts the transition cleanly
   toast.classList.remove('on');
@@ -62,7 +181,7 @@ export function showPersonaToast(message) {
   // duration scales with message length — a rough reading-time
   // estimate (~60ms/char) with sane floor/ceiling — so longer
   // messages stay up long enough to actually read.
-  const duration = Math.max(4200, Math.min(9000, message.length * 60));
+  const duration = Math.max(4200, Math.min(23000, message.length * 60));
   toastTimer = setTimeout(() => {
     toast.classList.remove('on');
   }, duration);

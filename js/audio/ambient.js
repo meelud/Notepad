@@ -40,10 +40,40 @@ function pickNextDegree(prevDegree) {
 // ─── Public API ─────────────────────────────────────────────────
 export function setAmbientDensity(v) { ambientDensity = v; }
 
+// Live harmonic context: the scale-degree root of whichever chord is
+// currently sounding in the ambient bed. Updated once per bar (every
+// time tick() picks a new chord), read by player.js so melody notes
+// can be chord-aware instead of blind to what's harmonizing underneath
+// them. null before the first chord of a session has been chosen.
+let currentChordRootDegree = null;
+export function getCurrentChordDegree() { return currentChordRootDegree; }
+
+// Direction the chord root just moved (-1 down, 0 none/first chord, +1
+// up), for contrary-motion melody bias — see harmonizeNote's caller.
+let currentChordDirection = 0;
+export function getChordDirection() { return currentChordDirection; }
+
+// Real-time bar-phase (0..1: 0=start of bar, 1=end), for player.js to
+// sync "strong beat" detection to the ACTUAL live rhythm instead of
+// guessing from word-position parity (measured via test/player-sim.mjs:
+// the old word-parity guess landed near a real downbeat only 21.3% of
+// the time — WORSE than the 30% pure chance would give, i.e. it had no
+// real relationship to the beat at all). Set once when the ambient
+// clock starts; read live by player.js's per-word loop.
+let ambientStartTime = null;
+export function getBarPhase() {
+  if (ambientStartTime === null) return 0;
+  const barMs = BEAT_SEC * BAR_BEATS * 1000;
+  return ((performance.now() - ambientStartTime) % barMs) / barMs;
+}
+
 export function clearAmb() {
   ambTimers.forEach(id => clearTimeout(id));
   ambTimers = [];
   clockRunning = false;
+  currentChordRootDegree = null;
+  currentChordDirection = 0;
+  ambientStartTime = null;
 }
 
 // ─── Ambient clock ──────────────────────────────────────────────
@@ -57,6 +87,7 @@ export function startAmbient(dests, isStopping) {
   const c = ac();
   const rev = getPadSend();
   clockRunning = true;
+  ambientStartTime = performance.now();
   let beat = 0;
   let lastDegree = null;
 
@@ -129,8 +160,11 @@ export function startAmbient(dests, isStopping) {
     const barDur = BEAT_SEC * BAR_BEATS;
 
     if (beatInBar === 0) {
+      const prevDegree = lastDegree;
       let degree = pickNextDegree(lastDegree);
+      currentChordDirection = prevDegree === null ? 0 : Math.sign(degree - prevDegree);
       lastDegree = degree;
+      currentChordRootDegree = degree;
       playChord(chordFromScale(currentScale, degree), barDur * 1.15);
       playTapeWarmth(barDur * 1.1);
     }

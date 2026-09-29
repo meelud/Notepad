@@ -1,18 +1,55 @@
 import { editor, render, ph, bPlay, bStop, bSave, bClear, wcEl } from './dom.js';
-import { play, stop, isPlaying, getAudioBlob, resetHarmony, clearAudioState } from './player.js';
+import { play, stop, isPlaying, getAudioBlob, getAudioMimeType, resetHarmony, clearAudioState } from './player.js';
+import { showPersonaToast } from './persona.js';
+import { blobToMp3 } from './audio/mp3encode.js';
+
+// maps a MediaRecorder mimeType to a real, matching file extension —
+// browsers don't all produce webm (e.g. Safari commonly gives mp4)
+function extensionFor(mimeType) {
+  if (mimeType.includes('mp4')) return 'mp4';
+  if (mimeType.includes('ogg')) return 'ogg';
+  if (mimeType.includes('wav')) return 'wav';
+  return 'webm';
+}
+
+// short, filesystem-safe slug from the first few words of the text
+function slugFromText(text) {
+  const words = text.trim().split(/\s+/).slice(0, 4).join(' ');
+  const slug = words
+    .replace(/[^\p{L}\p{N}\s-]/gu, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 40);
+  return slug || 'notepad';
+}
 
 export function initUI() {
 
   bPlay.addEventListener('click', play);
   bStop.addEventListener('click', stop);
 
-  bSave.addEventListener('click', () => {
+  bSave.addEventListener('click', async () => {
     const blob = getAudioBlob();
     if (!blob) return;
-    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+    const base = `${slugFromText(editor.value)}-${stamp}`;
+
+    showPersonaToast('Encoding to MP3…');
+    let outBlob = blob;
+    let filename = `${base}.${extensionFor(getAudioMimeType())}`;
+    try {
+      outBlob = await blobToMp3(blob);
+      filename = `${base}.mp3`;
+    } catch (err) {
+      // MP3 encoding failed (e.g. decodeAudioData issue on this browser) —
+      // fall back to the original recording so Save still works.
+    }
+
+    const url = URL.createObjectURL(outBlob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'reading.webm'; a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+    showPersonaToast(`Saved as ${filename}`);
   });
 
   bClear.addEventListener('click', () => {
