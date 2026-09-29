@@ -287,18 +287,24 @@ body:hover #feedback { opacity: 1; }
    (cool greys + a real specular highlight, not a lightened brass)
    ══════════════════════════════════════════════════════════════ */
 html.light {
-  --bg: #faf8f4;
-  --text: #2b2820;
-  --dim: #e9e6e0;
+  --bg: #f2ede3;
+  --text: #6b6659;
+  --dim: #e4ded2;
   --dimtxt: #6f6f68;
   --accent: #5b6b78;
-  --hl: #201c15;
+  --hl: #2e2620;
   --metal-hi: #eef4f7;
   --metal-mid: #c1ccd3;
-  --metal-lo: #869199;
+  --metal-lo: #a3adb3;
   --brass: #57585c;
   --brass-dim: #a3aeb4;
-  --word-glow: rgba(32,28,21,0.16);
+  --word-glow: rgba(91,107,120,0.28);
+}
+
+/* Global, not light-only — theme-aware via CSS variables (works for both themes). */
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--hl);
 }
 
 html.light #bar {
@@ -358,3 +364,9 @@ html.light #toast {
   border-color: rgba(0,0,0,0.1);
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
 }
+
+html.light #themeToggle {
+  opacity: 0.55;
+  box-shadow: 0 0 0 1px rgba(43,40,32,0.25), 0 0.5px 0 rgba(255,255,255,0.6) inset, 0 1px 2px rgba(0,0,0,0.25);
+}
+html.light #themeToggle:hover { opacity: 1; }
