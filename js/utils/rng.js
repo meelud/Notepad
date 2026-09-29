@@ -19,3 +19,8 @@ export function rnd(a, b) {
 export function pick(a) {
   return a[Math.floor(_rand() * a.length)];
 }
+
+export const rrnd = rnd;
+export const rpick = pick;
+export const arnd = rnd;
+export const apick = pick;
