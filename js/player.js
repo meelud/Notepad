@@ -8,9 +8,11 @@ import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequen
 import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions, deriveSemanticSpans } from './music/intention.js';
 import { deriveComposition } from './music/composition.js';
-// player.js only draws RENDER randomness (timbre, volume, pan, humanising
-// timing); melodic randomness stays inside harmony.js on the melodic stream.
+// player.js only draws RENDER randomness (timbre, volume, pan, articulation,
+// humanising timing) from the render stream (rrnd/rpick); melodic randomness
+// stays inside harmony.js on the melodic stream.
 import { seedRng, rrnd as rnd, rpick as pick } from './utils/rng.js';
+import { velocityRange, lengthRange } from './music/dynamics.js';
 import { barIndexAt, isStrongBeatAt, punctPauseFor, wordDurationMs, createChordClock } from './music/rhythm.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
@@ -428,10 +430,18 @@ export async function play() {
     const frac = sp.total > 1 ? (sp.pos - 1) / (sp.total - 1) : 0.5;
     const volArc = 0.85 + Math.sin(Math.PI * frac) * 0.3;
 
+    // Loudness and articulation follow the text's arousal (music/
+    // dynamics.js). These move only HOW a note sounds, never WHICH notes
+    // or HOW MANY, so the melodic stream is untouched. The draws below
+    // are from the RENDER stream (rrnd), and the number of draws per word
+    // is unchanged — the ranges are shifted, not re-sampled.
+    const velRange = velocityRange(sessionArousalScore, isCadence);
+    const lenRange = lengthRange(sessionArousalScore, isCadence);
+
     const vol = Math.max(0.12, Math.min(0.6,
-      (isCadence ? rnd(0.20, 0.40) : rnd(0.18, 0.52)) * volArc
+      rnd(velRange.lo, velRange.hi) * volArc
     ));
-    const dur = isCadence ? rnd(0.45, 0.75) : rnd(0.22, 0.45);
+    const dur = rnd(lenRange.lo, lenRange.hi);
 
     // subtle stereo placement per word — real width instead of
     // everything piling up dead-center. Kept modest (±0.35, not full

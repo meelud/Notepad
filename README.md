@@ -125,6 +125,16 @@ the baseline only when the behavior change is intentional.
 - **Save button hardcodes a `.webm` filename** regardless of the
   browser's actual `MediaRecorder` output format — can mislabel the
   file on browsers that don't produce webm (e.g. Safari).
+- **The output can clip when voices overlap.** There is no master
+  compressor or limiter anywhere in the audio path: word voices, ambient
+  pads and punctuation chimes all sum straight into `destination`. A
+  four-voice render through `OfflineAudioContext` peaks around **1.79**
+  against a ceiling of 1.0, so dense moments distort. This is
+  **pre-existing and independent of arousal** — it predates the
+  dynamics mapping and the arousal work, and is unchanged by them. It is
+  recorded here rather than fixed because fixing it means changing the
+  sound deliberately (a master gain trim, or a limiter), which needs an
+  explicit request rather than a drive-by edit.
 - **`voices.js` has real code duplication** (near-identical envelope
   patterns repeated across many of the 22 voices) — left alone
   deliberately, since refactoring risks touching sound character.
