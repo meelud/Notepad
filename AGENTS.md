@@ -45,23 +45,24 @@ node test/mode-mapping-test.mjs # valence x arousal -> mode invariants
 node test/arousal-test.mjs      # arousal -> tempo invariants
 ```
 
-**Three of the tests need a loader flag** — they run the real `play()`
+**Four of the tests need a loader flag** — they run the real `play()`
 headlessly, so they must be invoked as:
 
 ```bash
-node --import ./test/harness/register.mjs test/determinism-test.mjs  # 24/24
-node --import ./test/harness/register.mjs test/player-parity.mjs   # 106/106
-node --import ./test/harness/register.mjs test/sync-test.mjs        # 12/12
+node --import ./test/harness/register.mjs test/determinism-test.mjs       # 24/24
+node --import ./test/harness/register.mjs test/player-parity.mjs         # 106/106
+node --import ./test/harness/register.mjs test/sync-test.mjs              # 12/12
+node --import ./test/harness/register.mjs test/timeline-formula-test.mjs
 ```
 
 Running any of them as plain `node test/<name>.mjs` fails with a loader
 error. The `--import` hook registers `harness/trace-loader.mjs`, which
 wraps `harmony.js` to record melodic decisions without modifying
-production code. The other 14 scripts run directly.
+production code. The other scripts run directly.
 
 There is no aggregate runner because a `package.json` would violate the
 no-dependency rule; just loop over `test/*.mjs` and remember the flag
-for the three above.
+for the four above.
 
 **The test suite does not cover the browser entry point.** Nothing imports
 `main.js`, `ui.js`, `player.js`, `voices.js`, `ambient.js`, `reverb.js`,
