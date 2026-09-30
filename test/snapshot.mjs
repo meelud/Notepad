@@ -126,6 +126,11 @@ function diffPaths(a, b, path = '') {
     for (const k of keys) {
       diffs.push(...diffPaths(a[k], (b || {})[k], path ? `${path}.${k}` : k));
     }
+  } else if (typeof a === 'number' && typeof b === 'number' && Number.isFinite(a) && Number.isFinite(b)
+             && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b))) {
+    // Equal within floating-point noise. Frequencies come from Math.pow(2, n/12),
+    // whose last digit differs between V8 versions (1 ULP ≈ 1e-16). That is not
+    // a behaviour change, and re-baselining per machine would hide real drift.
   } else if (a !== b) {
     diffs.push(`${path}: ${JSON.stringify(a)} → ${JSON.stringify(b)}`);
   }
