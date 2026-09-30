@@ -1,52 +1,52 @@
 {
   "mood": {
     "en_simple_joy": {
-      "mode": "lydian",
+      "mode": "major",
       "normScore": 1.1745602737768266,
       "tenseScore": 0.22587697572631282
     },
     "en_negation": {
-      "mode": "harmonicMinor",
+      "mode": "dorian",
       "normScore": -0.4722463145781585,
       "tenseScore": 0.0757614408414158
     },
     "fa_simple_joy": {
-      "mode": "wholeTone",
+      "mode": "pentMajor",
       "normScore": 0.6415330278717849,
       "tenseScore": 0
     },
     "fa_negation": {
-      "mode": "harmonicMinor",
+      "mode": "dorian",
       "normScore": -0.584375,
       "tenseScore": 0.09374999999999999
     },
     "fa_question_mark": {
-      "mode": "melodicMinor",
+      "mode": "pentMajor",
       "normScore": 0.27187500000000003,
       "tenseScore": 0
     },
     "fa_comma_pause": {
-      "mode": "enigmatic",
+      "mode": "pentMajor",
       "normScore": 0.584375,
       "tenseScore": 0
     },
     "unicode_ellipsis": {
-      "mode": "doubleHarmonic",
+      "mode": "minor",
       "normScore": -1.1875,
       "tenseScore": 0.10000000000000002
     },
     "ascii_ellipsis": {
-      "mode": "doubleHarmonic",
+      "mode": "minor",
       "normScore": -1.1875,
       "tenseScore": 0.10000000000000002
     },
     "mixed_en_fa": {
-      "mode": "wholeTone",
+      "mode": "lydian",
       "normScore": 1.4930223194106993,
       "tenseScore": 0.5832118435198044
     },
     "empty_string": {
-      "mode": "dorian",
+      "mode": "mixolydian",
       "normScore": 0,
       "tenseScore": 0
     }
@@ -223,7 +223,7 @@
       146.8323839587038,
       164.81377845643496,
       174.61411571650194,
-      195.99771799087463
+      195.99771799087466
     ],
     "major_220": [
       220,
@@ -231,7 +231,7 @@
       277.1826309768721,
       293.6647679174076,
       329.6275569128699,
-      369.9944227116344,
+      369.99442271163446,
       415.3046975799451
     ],
     "dorian_440": [
@@ -240,8 +240,8 @@
       523.2511306011972,
       587.3295358348151,
       659.2551138257398,
-      739.9888454232688,
-      783.9908719634985
+      739.9888454232689,
+      783.9908719634986
     ]
   },
   "hash": {
@@ -251,49 +251,49 @@
   },
   "harmony": {
     "en_simple_joy": {
-      "mood": "lydian",
+      "mood": "major",
       "root": 138.59131548843604,
       "scaleLength": 7
     },
     "en_negation": {
-      "mood": "harmonicMinor",
-      "root": 61.735412657015516,
-      "scaleLength": 7
-    },
-    "fa_simple_joy": {
-      "mood": "wholeTone",
-      "root": 110,
-      "scaleLength": 6
-    },
-    "fa_negation": {
-      "mood": "harmonicMinor",
-      "root": 55,
-      "scaleLength": 7
-    },
-    "fa_question_mark": {
-      "mood": "melodicMinor",
+      "mood": "dorian",
       "root": 123.47082531403103,
       "scaleLength": 7
     },
-    "fa_comma_pause": {
-      "mood": "enigmatic",
-      "root": 195.99771799087463,
+    "fa_simple_joy": {
+      "mood": "pentMajor",
+      "root": 110,
+      "scaleLength": 5
+    },
+    "fa_negation": {
+      "mood": "dorian",
+      "root": 110,
       "scaleLength": 7
     },
+    "fa_question_mark": {
+      "mood": "pentMajor",
+      "root": 123.47082531403103,
+      "scaleLength": 5
+    },
+    "fa_comma_pause": {
+      "mood": "pentMajor",
+      "root": 195.99771799087466,
+      "scaleLength": 5
+    },
     "unicode_ellipsis": {
-      "mood": "doubleHarmonic",
-      "root": 69.29565774421802,
+      "mood": "minor",
+      "root": 138.59131548843604,
       "scaleLength": 7
     },
     "ascii_ellipsis": {
-      "mood": "doubleHarmonic",
-      "root": 55,
+      "mood": "minor",
+      "root": 110,
       "scaleLength": 7
     },
     "mixed_en_fa": {
-      "mood": "wholeTone",
+      "mood": "lydian",
       "root": 174.61411571650194,
-      "scaleLength": 6
+      "scaleLength": 7
     }
   }
 }

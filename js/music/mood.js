@@ -1,4 +1,3 @@
-import { MODE_ORDER } from './scales.js';
 import { EMOTION_LEXICON } from './lexicon-en.js';
 import { FA_LEXICON_COLLOQUIAL } from './lexicon-fa-colloquial.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
@@ -181,6 +180,69 @@ export function scanPhraseMatches(words) {
   return matches;
 }
 
+// ─── Valence × arousal → mode ────────────────────────────────────
+// Band edges are the SAME five sentiment buckets test/evaluate-mood.mjs
+// uses to score detectMood(), so "what counts as very positive" means
+// one thing across the project.
+export const VALENCE_EDGES = { veryNeg: -0.9, neg: -0.25, pos: 0.25, veryPos: 0.9 };
+
+// tenseScore ≥ this counts as "high arousal" (the project's existing cut).
+const HIGH_AROUSAL = 0.5;
+const INTENSE_AROUSAL = 1.0;
+
+/**
+ * Chooses the mode from the two numbers detectMood() measures, following
+ * Russell's (1980) circumplex model of affect: VALENCE (normScore) picks
+ * the family — minor-third modes for negative, major-third modes for
+ * positive — and AROUSAL (tenseScore) sets how far along it the piece
+ * goes: high arousal INTENSIFIES the valence's colour.
+ *
+ *   negative + calm     → sadness      → minor / dorian
+ *   negative + aroused  → anger, dread → harmonic minor → phrygian → locrian
+ *   positive + calm     → contentment  → pentatonic major
+ *   positive + aroused  → elation      → major → lydian
+ *   neutral             → mixolydian (major third, flat seventh: bright
+ *                         but unresolved — reads as neutral, not sad)
+ *
+ * Only modes whose third/fifth make their colour unambiguous are used
+ * (Gagnon & Peretz 2003; Hevner 1936): major third + perfect fifth reads
+ * happy, minor third reads sad, flat second / diminished fifth reads
+ * tense. The ambiguous exotic scales (wholeTone, enigmatic, doubleHarmonic,
+ * melodicMinor, phrygianDominant, diminished) stay in MODE_ORDER but are
+ * not reachable from here: on the old dark→bright ladder they sat between
+ * dorian and mixolydian, so mildly positive text landed on them and
+ * sounded eerie instead of happy.
+ *
+ * The previous rule darkened ANY text with tenseScore > 0.5 by four modes,
+ * which turned excited joy ("!!") into minor. Arousal now never moves
+ * positive text toward the dark side.
+ *
+ * Pure function of (normScore, tenseScore): deterministic, no rng.
+ * @param {number} norm   sentiment, roughly -1.5..1.5
+ * @param {number} tense  arousal/tension, ≥ 0 in practice
+ * @returns {string} a key of MODE_OFFSETS
+ */
+export function modeFor(norm, tense) {
+  const e = VALENCE_EDGES;
+  const aroused = tense >= HIGH_AROUSAL;
+  const intense = tense >= INTENSE_AROUSAL;
+  const moderate = tense >= 0.25;
+
+  if (norm <= e.veryNeg) {
+    return intense ? 'locrian' : aroused ? 'phrygian' : moderate ? 'harmonicMinor' : 'minor';
+  }
+  if (norm <= e.neg) {
+    return intense ? 'phrygian' : aroused ? 'harmonicMinor' : moderate ? 'minor' : 'dorian';
+  }
+  if (norm < e.pos) {
+    return intense ? 'minor' : aroused ? 'dorian' : 'mixolydian';
+  }
+  if (norm < e.veryPos) {
+    return aroused ? 'major' : 'pentMajor';
+  }
+  return aroused ? 'lydian' : 'major';
+}
+
 export function detectMood(text) {
   const lower = text.toLowerCase().replace(/n['’]t\b/g, ' not');
   const totalWords = (lower.match(/[a-zA-Zا-ی]+/g) || []).length;
@@ -278,7 +340,14 @@ export function detectMood(text) {
   const exclaim  = (text.match(/!/g) || []).length;
   const question = (text.match(/[?؟]/g) || []).length;
   const ellipsis = (text.match(/\.\.\.|…/g) || []).length;
-  score += exclaim * 0.4;
+  // An exclamation mark says HOW MUCH the writer feels, not WHICH way. It
+  // used to add a flat +0.4 to the valence even when the words were
+  // negative, so "I hate everything about this!!!" read as positive and an
+  // angry text was pushed toward a major mode. Now it amplifies negative
+  // sentiment the words already carry. With no negative evidence it keeps
+  // its earlier meaning — mild enthusiasm ("وای چه خبر عالی!!" has no
+  // lexicon hit for the good news itself, only the "!!" gives it away).
+  score += (score < 0 ? -1 : 1) * exclaim * 0.4;
   score -= question * 0.25;
   score -= ellipsis * 0.3;
   tense += exclaim * 0.5;
@@ -286,11 +355,5 @@ export function detectMood(text) {
   const norm = score / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
   const tenseNorm = tense / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
 
-  const clamped = Math.max(-1.5, Math.min(1.5, norm));
-  let idx = Math.round(((clamped + 1.5) / 3.0) * (MODE_ORDER.length - 1));
-
-  if (tenseNorm > 0.5 && idx > 3) idx = Math.max(1, idx - 4);
-  idx = Math.max(0, Math.min(MODE_ORDER.length - 1, idx));
-
-  return { mode: MODE_ORDER[idx], normScore: norm, tenseScore: tenseNorm };
+  return { mode: modeFor(norm, tenseNorm), normScore: norm, tenseScore: tenseNorm };
 }
