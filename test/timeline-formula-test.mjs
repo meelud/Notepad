@@ -16,7 +16,7 @@
  *   node --import ./test/harness/register.mjs test/timeline-formula-test.mjs
  */
 import { runPlay } from './harness/run-play.mjs';
-import { wordDurationMs, punctPauseMs, pacingFactorFor } from '../js/music/rhythm.js';
+import { wordDurationMs, punctPauseFor, pacingFactorFor } from '../js/music/rhythm.js';
 import { detectMood } from '../js/music/mood.js';
 import { tokenize } from '../js/utils/text.js';
 import path from 'node:path';
@@ -33,7 +33,7 @@ function plannedOnsets(text, arousal) {
   let ms = 0;
   for (let i = 0; i < toks.length; i++) {
     const t = toks[i];
-    if (t.type === 'punct') { ms += punctPauseMs(t.text); continue; }
+    if (t.type === 'punct') { ms += punctPauseFor(t.text, arousal); continue; }
     onsets.push(ms);
     const letters = (t.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
     const next = toks[i + 1];

@@ -23,7 +23,7 @@ import { wordEmotionWeight } from '../js/music/mood.js';
 import { deriveIntentions, deriveSemanticSpans } from '../js/music/intention.js';
 import { deriveComposition } from '../js/music/composition.js';
 import { seedRng } from '../js/utils/rng.js';
-import { barIndexAt, isStrongBeatAt, punctPauseMs, wordDurationMs, createChordClock } from '../js/music/rhythm.js';
+import { barIndexAt, isStrongBeatAt, punctPauseFor, wordDurationMs, createChordClock } from '../js/music/rhythm.js';
 import { tokenize } from '../js/utils/text.js';
 
 const SEMANTIC_WEIGHT_THRESHOLD = 0.5;
@@ -84,7 +84,7 @@ export function simulateText(text) {
     const tok = playable[i];
 
     if (tok.type === 'punct') {
-      const pause = punctPauseMs(tok.text);
+      const pause = punctPauseFor(tok.text, sessionArousalScore);
       virtualMs += pause;
       continue;
     }

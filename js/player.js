@@ -11,7 +11,7 @@ import { deriveComposition } from './music/composition.js';
 // player.js only draws RENDER randomness (timbre, volume, pan, humanising
 // timing); melodic randomness stays inside harmony.js on the melodic stream.
 import { seedRng, rrnd as rnd, rpick as pick } from './utils/rng.js';
-import { barIndexAt, isStrongBeatAt, punctPauseMs, wordDurationMs, createChordClock } from './music/rhythm.js';
+import { barIndexAt, isStrongBeatAt, punctPauseFor, wordDurationMs, createChordClock } from './music/rhythm.js';
 import { tokenize, esc, buildRender, sleep } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
 
@@ -280,8 +280,8 @@ export async function play() {
     if (tok.type === 'punct') {
       // Advance the virtual clock BEFORE anything that can throw, so a
       // failed playPunctuation can't desynchronise the timeline.
-      // Pause lengths: music/rhythm.js punctPauseMs.
-      virtualMs += punctPauseMs(tok.text);
+      // Pause lengths: music/rhythm.js punctPauseFor, scaled by tempo.
+      virtualMs += punctPauseFor(tok.text, sessionArousalScore);
       const intensity = 0.7 + 0.3;
       playPunctuation(tok.text, dests, intensity);
       await waitUntilVirtual(virtualMs);

@@ -6,7 +6,7 @@
  *   node test/arousal-test.mjs
  */
 import { detectMood } from '../js/music/mood.js';
-import { pacingFactorFor, saturateArousal, wordDurationMs, TEMPO_CEILING } from '../js/music/rhythm.js';
+import { pacingFactorFor, saturateArousal, wordDurationMs, punctPauseMs, punctPauseFor, PAUSE_SCALING_FLOOR, TEMPO_CEILING } from '../js/music/rhythm.js';
 import { tokenize } from '../js/utils/text.js';
 
 let fails = 0;
@@ -98,6 +98,61 @@ check('sad text plans longer words than joyful text', dur('I am sad and lonely')
   check('total planned word time is shorter for the same text shouted',
     totalMs(angry, angA) < totalMs(angry, calmA),
     `${totalMs(angry, angA).toFixed(0)}ms vs ${totalMs(angry, calmA).toFixed(0)}ms`);
+}
+
+// 5. rests belong to the tempo. punctPauseFor scales with the same
+//    pacingFactorFor as wordDurationMs, so a piece's silences move with
+//    its words instead of diluting the tempo effect.
+{
+  const PUNCT = ['.', '?', '؟', '!', ',', '،', ';'];
+  check('neutral text is completely unchanged (rests do not scale at arousal 0)',
+    PUNCT.every(ch => punctPauseFor(ch, 0) === punctPauseMs(ch)));
+
+  let bad = null;
+  for (const ch of PUNCT) {
+    let prev = Infinity;
+    for (let a = 0; a <= 3.0001; a += 0.02) {
+      const v = punctPauseFor(ch, a);
+      if (v > prev + 1e-9) { bad ??= `${JSON.stringify(ch)} rises at a=${a.toFixed(2)}`; break; }
+      prev = v;
+    }
+  }
+  check('a pause is never longer as arousal rises', bad === null, bad);
+
+  check('excited text shortens its rests', punctPauseFor('.', 1.65) < punctPauseFor('.', 0),
+    `${punctPauseFor('.', 1.65).toFixed(0)}ms vs ${punctPauseFor('.', 0)}ms`);
+  check('calm text lengthens its rests', punctPauseFor('.', -0.6) > punctPauseFor('.', 0),
+    `${punctPauseFor('.', -0.6).toFixed(0)}ms vs ${punctPauseFor('.', 0)}ms`);
+
+  check('a rest never collapses to nothing', PUNCT.every(ch => punctPauseFor(ch, 1e9) > 0));
+  check(`a rest never stretches past ${1 / PAUSE_SCALING_FLOOR}x nominal (it would read as a fault, not a pause)`,
+    PUNCT.every(ch => punctPauseFor(ch, -1e9) <= punctPauseMs(ch) / PAUSE_SCALING_FLOOR + 1e-9),
+    `worst: ${(Math.max(...PUNCT.map(ch => punctPauseFor(ch, -1e9) / punctPauseMs(ch)))).toFixed(2)}x`);
+
+  // the point of the change: pauses used to dilute the tempo signal
+  const ANGRY = 'I am furious!!!! and I hate this so much right now okay';
+  const CALM = 'I am calm, and I hate this so much right now totally';
+  const span = (text, scale) => {
+    const a = A(text);
+    const toks = tokenize(text).filter(t => t.type === 'word' || t.type === 'punct');
+    let word = 0, pause = 0, words = 0;
+    for (let i = 0; i < toks.length; i++) {
+      const t = toks[i];
+      if (t.type === 'punct') { pause += scale ? punctPauseFor(t.text, a) : punctPauseMs(t.text); continue; }
+      const w = (t.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
+      const nxt = toks[i + 1];
+      const isCad = !!(nxt && nxt.type === 'punct' && ['.', '!', '?', '؟'].includes(nxt.text));
+      word += wordDurationMs(w, a, isCad); words++;
+    }
+    return { perWord: (word + pause) / words };
+  };
+  const angryScaled = span(ANGRY, true).perWord, calmScaled = span(CALM, true).perWord;
+  const angryFixed = span(ANGRY, false).perWord, calmFixed = span(CALM, false).perWord;
+  const gain = (1 - angryScaled / calmScaled) * 100;
+  const before = (1 - angryFixed / calmFixed) * 100;
+  check('scaling rests strengthens the tempo contrast between the pair', gain > before,
+    `before ${before.toFixed(1)}% -> after ${gain.toFixed(1)}%`);
+  console.log(`      length-controlled pair: tempo contrast ${before.toFixed(1)}% (fixed rests) -> ${gain.toFixed(1)}% (scaled rests)`);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall arousal invariants hold');

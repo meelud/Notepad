@@ -48,13 +48,37 @@ export function isStrongBeatAt(virtualMs) {
 }
 
 // ─── Planned durations (pure functions of the text) ──────────────
-/** Pause after a punctuation token, in ms. */
+/**
+ * Pause after a punctuation token, in ms, at neutral tempo.
+ * Multiply by pacingFactorFor(sessionArousal) to get the pause the piece
+ * will actually take — see punctPauseFor.
+ */
 export function punctPauseMs(ch) {
   return (ch === '.') ? 420
        : (ch === '?' || ch === '؟') ? 380
        : (ch === '!') ? 340
-       : (ch === ',' || ch === '،') ? 200
+       : (ch === ',') ? 200
        : 150;
+}
+
+/**
+ * Planned pause in ms, scaled by the same tempo law as word durations.
+ *
+ * Rests belong to the tempo. A speaker who speeds up shortens their
+ * silences too, and a piece whose rests never move reads as mechanical
+ * next to one whose rests breathe. Scaling with the same
+ * pacingFactorFor that wordDurationMs uses keeps a bar the same
+ * perceptual shape at any arousal, and leaves neutral text untouched
+ * (pacingFactorFor(0) === 1).
+ *
+ * The scaling is clamped to half-length at the slow end: at the deepest
+ * calm, word durations stretch 1.26x, but a rest more than 2x its
+ * nominal length stops reading as a pause and starts reading as a fault.
+ */
+export const PAUSE_SCALING_FLOOR = 0.5;
+
+export function punctPauseFor(ch, sessionArousal) {
+  return punctPauseMs(ch) * Math.max(PAUSE_SCALING_FLOOR, pacingFactorFor(sessionArousal));
 }
 
 /**
