@@ -34,7 +34,8 @@ made changes in this folder; that is the signal to review and commit them.
 
 ## Testing
 
-Zero-dependency Node scripts, no build step:
+16 zero-dependency Node scripts, no build step, no `package.json`.
+Run them all before a commit.
 
 ```bash
 node test/snapshot.mjs          # regression baseline (pure-logic modules)
@@ -42,15 +43,30 @@ node test/snapshot.mjs --update # accept an intentional behaviour change
 node test/evaluate-mood.mjs     # sentiment accuracy report
 ```
 
-The other `test/*.mjs` files are diagnostics and simulations; run them all
-before a commit. They are not in a runner because there is no `package.json`
-— that is deliberate, per the project's no-dependency rule.
+**Three of the tests need a loader flag** — they run the real `play()`
+headlessly, so they must be invoked as:
+
+```bash
+node --import ./test/harness/register.mjs test/determinism-test.mjs  # 24/24
+node --import ./test/harness/register.mjs test/player-parity.mjs   # 106/106
+node --import ./test/harness/register.mjs test/sync-test.mjs        # 12/12
+```
+
+Running any of them as plain `node test/<name>.mjs` fails with a loader
+error. The `--import` hook registers `harness/trace-loader.mjs`, which
+wraps `harmony.js` to record melodic decisions without modifying
+production code. The other 13 scripts run directly.
+
+There is no aggregate runner because a `package.json` would violate the
+no-dependency rule; just loop over `test/*.mjs` and remember the flag
+for the three above.
 
 **The test suite does not cover the browser entry point.** Nothing imports
 `main.js`, `ui.js`, `player.js`, `voices.js`, `ambient.js`, `reverb.js`,
 `context.js`, `punctuation.js`, `mp3encode.js`, `persona.js` or `dom.js`,
-because they need a DOM and an AudioContext. A broken import in any of them
-ships green. **Always open the app in a browser after changing one of them.**
+because they need a real DOM and AudioContext. A broken import in any of
+them ships green. **Always open the app in a browser after changing one
+of them.**
 
 ## Architecture
 
@@ -70,10 +86,47 @@ editor text
 ```
 
 Determinism is a hard requirement: the same text must always produce the
-same performance. `js/utils/rng.js` is the shared seeded stream; if you
-add randomness, decide deliberately whether it belongs on that stream
-(affects the piece) or on an isolated one (must not), and say so in a
-comment.
+same performance.
+
+### Randomness: three independent streams
+
+`js/utils/rng.js` exports **three separate seeded streams**, not one
+shared stream:
+
+| stream | exports | used by | affects notes? |
+|---|---|---|---|
+| **melodic** | `rnd`, `pick` | `harmony.js` — note choices, cadence, motif | yes |
+| **render** | `rrnd`, `rpick` | `voices.js` timbre, `player.js` volume/pan/timing offsets | no |
+| **ambient** | `arnd`, `apick` | `ambient.js` pads, pulse, motif notes | no |
+
+They are separated so that ambient's independent `setTimeout` chain and
+per-voice timbre jitter can never shift the melodic stream. Before this
+split every draw came from one shared stream, so a change to timbre or a
+different timer interleaving changed the melody.
+
+Rules when adding randomness:
+
+- **Decide which stream it belongs to, on purpose, and say which in a
+  comment.** A draw that can affect the notes must never be taken from
+  inside a timer callback or an audio callback.
+- **`rrnd` and `arnd` must never be aliases of `rnd`.** They are separate
+  state, each salted differently on seed. If you find yourself wanting to
+  write `export const rrnd = rnd` because an import is missing, then
+  `rng.js` is incomplete — fix `rng.js`. Do not paper over a missing
+  export with an alias; that silently collapses the three streams back
+  into one and is exactly the bug this note exists to prevent.
+
+### Timing: musical decisions come from `music/rhythm.js`
+
+Every musical decision must be derived from the virtual timeline in
+`music/rhythm.js` — `virtualMs`, the running sum of *planned* durations.
+Never derive a decision from `performance.now()`, a wall-clock read, or
+ambient's `getBarPhase()`. `performance.now()` is only allowed for
+scheduling *when* a sound is heard, never for deciding *what* it is.
+
+This is what makes a piece sound the same on a fast machine and a slow
+one, and it is why the words land on the bars the ambient bed is actually
+playing.
 
 ## Non-negotiable rules
 
