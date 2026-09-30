@@ -185,6 +185,8 @@ export function scanPhraseMatches(words) {
 // uses to score detectMood(), so "what counts as very positive" means
 // one thing across the project.
 export const VALENCE_EDGES = { veryNeg: -0.9, neg: -0.25, pos: 0.25, veryPos: 0.9 };
+// Inside the 'neg' bucket, above this only faint negativity remains.
+const MILD_NEG = -0.4;
 
 // tenseScore ≥ this counts as "high arousal" (the project's existing cut).
 const HIGH_AROUSAL = 0.5;
@@ -197,7 +199,7 @@ const INTENSE_AROUSAL = 1.0;
  * positive — and AROUSAL (tenseScore) sets how far along it the piece
  * goes: high arousal INTENSIFIES the valence's colour.
  *
- *   negative + calm     → sadness      → minor / dorian
+ *   negative + calm     → sadness      → minor (dorian only if faint)
  *   negative + aroused  → anger, dread → harmonic minor → phrygian → locrian
  *   positive + calm     → contentment  → pentatonic major
  *   positive + aroused  → elation      → major → lydian
@@ -232,7 +234,14 @@ export function modeFor(norm, tense) {
     return intense ? 'locrian' : aroused ? 'phrygian' : moderate ? 'harmonicMinor' : 'minor';
   }
   if (norm <= e.neg) {
-    return intense ? 'phrygian' : aroused ? 'harmonicMinor' : moderate ? 'minor' : 'dorian';
+    // Calm, clearly negative text (grief, emptiness, exhaustion) is the
+    // circumplex's low-arousal / negative corner: it needs a plain minor
+    // colour. Dorian's raised sixth reads wistful-but-hopeful, so it is
+    // kept only for the faintest negativity (MILD_NEG).
+    if (intense) return 'phrygian';
+    if (aroused) return 'harmonicMinor';
+    if (moderate) return 'minor';
+    return norm > MILD_NEG ? 'dorian' : 'minor';
   }
   if (norm < e.pos) {
     return intense ? 'minor' : aroused ? 'dorian' : 'mixolydian';

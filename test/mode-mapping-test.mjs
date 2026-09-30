@@ -66,6 +66,9 @@ for (let t = 0; t <= 2.0001; t += 0.05) tenses.push(+t.toFixed(2));
 }
 // 5. neutral & calm → mixolydian
 check('neutral calm text → mixolydian', modeFor(0, 0) === 'mixolydian' && modeFor(0.2, 0.1) === 'mixolydian' && modeFor(0.0, 0.3) === 'mixolydian');
+// 5b. calm, clearly negative text is plain minor (dorian reads hopeful)
+check('calm + clearly negative → minor, not dorian', modeFor(-0.6, 0) === 'minor' && modeFor(-1.2, 0.1) === 'minor');
+check('calm + faintly negative → dorian', modeFor(-0.3, 0) === 'dorian');
 // 6. end to end on real sentences
 const E2E = [
   ['وای چه خبر عالی!!', c => c.maj3 && c.P5],            // used to become minor
