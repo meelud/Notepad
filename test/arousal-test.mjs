@@ -104,9 +104,26 @@ check('sad text plans longer words than joyful text', dur('I am sad and lonely')
 //    pacingFactorFor as wordDurationMs, so a piece's silences move with
 //    its words instead of diluting the tempo effect.
 {
-  const PUNCT = ['.', '?', '؟', '!', ',', '،', ';'];
+  // pairs the tokenizer actually distinguishes; anything else it emits
+  // (؛ : and friends) falls through to the deliberate 150ms default
+  const PUNCT = ['.', '?', '؟', '!', ',', '،'];
   check('neutral text is completely unchanged (rests do not scale at arousal 0)',
     PUNCT.every(ch => punctPauseFor(ch, 0) === punctPauseMs(ch)));
+
+  // Bilingual punctuation. The Persian comma fell through to the 150ms
+  // default while the English one got 200ms, so every Persian sentence
+  // with a comma ran 50ms tight. Nothing else in the suite caught it:
+  // the snapshot fixtures use a question mark and an ellipsis, and the
+  // harmony tests never look at timing.
+  check('the Persian comma gets the same pause as the English one',
+    punctPauseMs('،') === punctPauseMs(',') && punctPauseMs('،') === 200,
+    `«،»=${punctPauseMs('،')}ms  «,»=${punctPauseMs(',')}ms`);
+  check('the Persian question mark gets the same pause as the English one',
+    punctPauseMs('؟') === punctPauseMs('?') && punctPauseMs('؟') === 380,
+    `«؟»=${punctPauseMs('؟')}ms  «?»=${punctPauseMs('?')}ms`);
+  check('no distinguished punctuation falls through to the 150ms default',
+    PUNCT.every(ch => punctPauseMs(ch) !== 150),
+    PUNCT.filter(ch => punctPauseMs(ch) === 150).join(' '));
 
   let bad = null;
   for (const ch of PUNCT) {

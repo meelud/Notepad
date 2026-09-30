@@ -57,7 +57,7 @@ export function punctPauseMs(ch) {
   return (ch === '.') ? 420
        : (ch === '?' || ch === '؟') ? 380
        : (ch === '!') ? 340
-       : (ch === ',') ? 200
+       : (ch === ',' || ch === '،') ? 200
        : 150;
 }
 

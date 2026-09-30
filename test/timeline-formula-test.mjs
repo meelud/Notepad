@@ -16,11 +16,58 @@
  *   node --import ./test/harness/register.mjs test/timeline-formula-test.mjs
  */
 import { runPlay } from './harness/run-play.mjs';
-import { wordDurationMs, punctPauseFor, pacingFactorFor } from '../js/music/rhythm.js';
 import { detectMood } from '../js/music/mood.js';
 import { tokenize } from '../js/utils/text.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// The tempo and dynamics laws are re-implemented here from their
+// specifications rather than imported. Importing wordDurationMs /
+// pacingFactorFor / velocityRange from js/ would make this test
+// tautological: if player.js passed the wrong score, and this file
+// computed its expectation from the same helpers, both would move
+// together and the assertion would still pass. The constants below are
+// transcribed from each module's documented law and are the only thing
+// in this file allowed to define the expected values.
+const TEMPO_EXPONENT = 0.55;
+const CALM_FLOOR = -0.6;
+const PAUSE_FLOOR = 0.5;
+const DYNAMICS_EXPONENT = 0.62;
+const DYNAMICS_CALM_SATURATION = -0.42;
+// FLOOR_RISE per window, from dynamics.js
+const FLOOR_RISE_WORD = 0.4557;
+const FLOOR_RISE_CADENCE = 0.6640;
+const NEUTRAL_WORD = [0.18, 0.52];
+const NEUTRAL_CADENCE = [0.20, 0.40];
+
+function expectedPacingFactor(arousal) {
+  const s = arousal >= 0 ? Math.tanh(arousal) : Math.max(arousal, CALM_FLOOR);
+  return Math.pow(2, -TEMPO_EXPONENT * s);
+}
+function expectedWordMs(letters, arousal, isCadence) {
+  const base = (380 + letters * 42) * expectedPacingFactor(arousal);
+  return (isCadence ? base * 1.2 : base) + 20;
+}
+const NOMINAL_PAUSE = { '.': 420, '?': 380, '؟': 380, '!': 340, ',': 200, '،': 200 };
+function expectedPauseMs(ch, arousal) {
+  const nominal = NOMINAL_PAUSE[ch] ?? 150;
+  return nominal * Math.max(PAUSE_FLOOR, expectedPacingFactor(arousal));
+}
+
+/** gain window player.js will draw its loudness from */
+function expectedVelocityRange(arousal, isCadence) {
+  const [lo, hi] = isCadence ? NEUTRAL_CADENCE : NEUTRAL_WORD;
+  if (arousal > 0) {
+    const k = isCadence ? FLOOR_RISE_CADENCE : FLOOR_RISE_WORD;
+    return { lo: lo + (hi - lo) * k * Math.tanh(arousal), hi };
+  }
+  if (arousal < 0) {
+    const s = Math.max(arousal, DYNAMICS_CALM_SATURATION);
+    const k = Math.pow(2, DYNAMICS_EXPONENT * s);
+    return { lo: lo * k, hi: hi * k };
+  }
+  return { lo, hi };
+}
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HUMANISE_MS = 28;   // player.js: rnd(-28, 28) on each onset
@@ -33,12 +80,12 @@ function plannedOnsets(text, arousal) {
   let ms = 0;
   for (let i = 0; i < toks.length; i++) {
     const t = toks[i];
-    if (t.type === 'punct') { ms += punctPauseFor(t.text, arousal); continue; }
+    if (t.type === 'punct') { ms += expectedPauseMs(t.text, arousal); continue; }
     onsets.push(ms);
     const letters = (t.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
     const next = toks[i + 1];
     const isCadence = !!(next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text));
-    ms += wordDurationMs(letters, arousal, isCadence);
+    ms += expectedWordMs(letters, arousal, isCadence);
   }
   return onsets;
 }
@@ -71,7 +118,7 @@ for (const [label, text] of CASES) {
     const dev = (trace[i].t - t0) - expected[i];
     if (Math.abs(dev) > Math.abs(maxDev)) { maxDev = dev; worst = i; }
   }
-  check(`${label}: real play() onsets track the formula (arousal=${arousal.toFixed(3)}, factor=${pacingFactorFor(arousal).toFixed(3)})`,
+  check(`${label}: real play() onsets track the formula (arousal=${arousal.toFixed(3)}, factor=${expectedPacingFactor(arousal).toFixed(3)})`,
     Math.abs(maxDev) <= TOL,
     `worst word #${worst} off by ${maxDev.toFixed(1)}ms (>${TOL})`);
 
