@@ -62,19 +62,44 @@ export function punctPauseMs(ch) {
  * Tempo is the strongest single arousal cue in music (Juslin & Laukka
  * 2003), and perceived speed is logarithmic, so the law is exponential:
  *
- *     pacing = 2^(-0.55 * arousal)     arousal clamped to [-0.6, 1]
+ *     s(a)     = a >= 0 ? tanh(a) : max(a, -0.6)
+ *     pacing   = 2^(-0.55 * s(a))
  *
- *     arousal  1.0 (fury, elation)  → words 32% shorter  (1.46x faster)
+ *     arousal  1.0 (fury, elation)  → words 25% shorter  (1.34x faster)
  *     arousal  0.0 (neutral)        → unchanged
  *     arousal -0.6 (calm, grief)    → words 26% longer   (0.79x)
  *
- * The old law was linear, capped at +/-15% (a 1.05x gap between excited
- * and sad text, about one just-noticeable difference of tempo).
+ * WHY SATURATE. The previous law hard-clipped arousal at 1.0, so every
+ * value above it collapsed to the same tempo: on a 6-letter word,
+ * arousal 1.13 and arousal 2.90 both planned 451.7 ms. Real text
+ * reaches well past 1 — repeated "!" accumulates +0.313 per mark with
+ * no diminishing return, and a four-"!!!" sentence scored 2.90 — so
+ * the loudest, fastest texts were exactly the ones the law could not
+ * distinguish from moderately excited ones.
+ *
+ * Simply raising the clip is not the fix: at 2.9 that would be 3x the
+ * speed, which is not what an excited person sounds like. tanh keeps
+ * the original slope near neutral, stays strictly monotone over the
+ * whole real range, and asymptotes at 2^0.55 = 1.46x — the same
+ * ceiling the old law had, so the loudest text still cannot run away.
+ * The negative side keeps its hard floor at -0.6: calm and grief read
+ * as the same slowness, which is what that bound was already doing.
+ *
+ * The old law before all this was linear, capped at +/-15% (a 1.05x gap
+ * between excited and sad text, about one just-noticeable difference).
  */
 export const TEMPO_EXPONENT = 0.55;
+export const TEMPO_CEILING = Math.pow(2, TEMPO_EXPONENT); // 1.4641x, never exceeded
+export const TEMPO_FLOOR_AROUSAL = -0.6;
+
+/** Saturating arousal → tempo mapping. Strictly monotone; see above. */
+export function saturateArousal(a) {
+  if (a >= 0) return Math.tanh(a);
+  return Math.max(a, TEMPO_FLOOR_AROUSAL);
+}
+
 export function pacingFactorFor(sessionArousal) {
-  const a = Math.max(-0.6, Math.min(1.0, sessionArousal));
-  return Math.pow(2, -TEMPO_EXPONENT * a);
+  return Math.pow(2, -TEMPO_EXPONENT * saturateArousal(sessionArousal));
 }
 
 /**
