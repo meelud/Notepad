@@ -58,17 +58,35 @@ export function punctPauseMs(ch) {
 }
 
 /**
- * Planned duration of a word, in ms: 380ms + 42ms/letter, tense text
- * reading up to 15% faster, cadence words 20% longer. The +20 is the
- * midpoint of the ±jitter playback used to add (rnd(-20,60)); the
- * random part is no longer part of the timeline — it is applied on top
+ * Tempo law: how much faster/slower a piece plays for a given arousal.
+ * Tempo is the strongest single arousal cue in music (Juslin & Laukka
+ * 2003), and perceived speed is logarithmic, so the law is exponential:
+ *
+ *     pacing = 2^(-0.55 * arousal)     arousal clamped to [-0.6, 1]
+ *
+ *     arousal  1.0 (fury, elation)  → words 32% shorter  (1.46x faster)
+ *     arousal  0.0 (neutral)        → unchanged
+ *     arousal -0.6 (calm, grief)    → words 26% longer   (0.79x)
+ *
+ * The old law was linear, capped at +/-15% (a 1.05x gap between excited
+ * and sad text, about one just-noticeable difference of tempo).
+ */
+export const TEMPO_EXPONENT = 0.55;
+export function pacingFactorFor(sessionArousal) {
+  const a = Math.max(-0.6, Math.min(1.0, sessionArousal));
+  return Math.pow(2, -TEMPO_EXPONENT * a);
+}
+
+/**
+ * Planned duration of a word, in ms: 380ms + 42ms/letter, scaled by the
+ * text's arousal (pacingFactorFor), cadence words 20% longer. The +20 is
+ * the midpoint of the +/-jitter playback used to add (rnd(-20,60)); the
+ * random part is no longer part of the timeline - it is applied on top
  * of each word's ONSET by player.js as a non-accumulating humanising
  * offset, so it can no longer affect any decision.
  */
-export function wordDurationMs(wordLetterCount, sessionTenseScore, isCadence) {
-  const clampedTense = Math.max(-0.5, Math.min(1.0, sessionTenseScore));
-  const pacingFactor = 1 - clampedTense * 0.15;
-  const base = (380 + wordLetterCount * 42) * pacingFactor;
+export function wordDurationMs(wordLetterCount, sessionArousal, isCadence) {
+  const base = (380 + wordLetterCount * 42) * pacingFactorFor(sessionArousal);
   return (isCadence ? base * 1.2 : base) + 20;
 }
 

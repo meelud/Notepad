@@ -40,11 +40,11 @@ function normalizePhrase(str) {
 let MAX_PHRASE_LEN = 1;
 const PHRASE_LOOKUP = (() => {
   const map = {};
-  Object.values(EMOTION_LEXICON).forEach(({ weight, tense, words }) => {
+  Object.values(EMOTION_LEXICON).forEach(({ weight, tense, arousal = 0, words }) => {
     words.forEach(w => {
       const key = normalizePhrase(w);
       if (!key) return;
-      map[key] = { weight, tense };
+      map[key] = { weight, tense, arousal };
       const len = key.split(' ').length;
       if (len > MAX_PHRASE_LEN) MAX_PHRASE_LEN = len;
     });
@@ -155,7 +155,7 @@ export function scanPhraseMatches(words) {
       }
 
       if (hit) {
-        matches.push({ index: i, length: consumedLen, weight: hit.weight, tense: hit.tense });
+        matches.push({ index: i, length: consumedLen, weight: hit.weight, tense: hit.tense, arousal: hit.arousal });
         matchedLen = consumedLen;
         break;
       }
@@ -167,7 +167,7 @@ export function scanPhraseMatches(words) {
           const stem = words[i].slice(0, -suf.length);
           const hit = PHRASE_LOOKUP[stem];
           if (hit) {
-            matches.push({ index: i, length: 1, weight: hit.weight * 0.85, tense: hit.tense * 0.85 });
+            matches.push({ index: i, length: 1, weight: hit.weight * 0.85, tense: hit.tense * 0.85, arousal: hit.arousal * 0.85 });
             matchedLen = 1;
             break;
           }
@@ -188,7 +188,7 @@ export const VALENCE_EDGES = { veryNeg: -0.9, neg: -0.25, pos: 0.25, veryPos: 0.
 // Inside the 'neg' bucket, above this only faint negativity remains.
 const MILD_NEG = -0.4;
 
-// tenseScore ≥ this counts as "high arousal" (the project's existing cut).
+// arousalScore ≥ this counts as "high arousal".
 const HIGH_AROUSAL = 0.5;
 const INTENSE_AROUSAL = 1.0;
 
@@ -196,7 +196,7 @@ const INTENSE_AROUSAL = 1.0;
  * Chooses the mode from the two numbers detectMood() measures, following
  * Russell's (1980) circumplex model of affect: VALENCE (normScore) picks
  * the family — minor-third modes for negative, major-third modes for
- * positive — and AROUSAL (tenseScore) sets how far along it the piece
+ * positive — and AROUSAL (arousalScore) sets how far along it the piece
  * goes: high arousal INTENSIFIES the valence's colour.
  *
  *   negative + calm     → sadness      → minor (dorian only if faint)
@@ -221,7 +221,7 @@ const INTENSE_AROUSAL = 1.0;
  *
  * Pure function of (normScore, tenseScore): deterministic, no rng.
  * @param {number} norm   sentiment, roughly -1.5..1.5
- * @param {number} tense  arousal/tension, ≥ 0 in practice
+ * @param {number} tense  ACTIVATION (detectMood's arousalScore, not its tenseScore); the parameter keeps its old name so callers/tests stay valid
  * @returns {string} a key of MODE_OFFSETS
  */
 export function modeFor(norm, tense) {
@@ -255,7 +255,7 @@ export function modeFor(norm, tense) {
 export function detectMood(text) {
   const lower = text.toLowerCase().replace(/n['’]t\b/g, ' not');
   const totalWords = (lower.match(/[a-zA-Zا-ی]+/g) || []).length;
-  let score = 0, tense = 0;
+  let score = 0, tense = 0, arousal = 0;
 
   const sentences = lower.split(/[.!?؟]+/);
 
@@ -315,6 +315,9 @@ export function detectMood(text) {
           } else {
             score += hit.weight * m;
             tense += hit.tense * m;
+            // A negated emotion is denied, so it is no evidence of its
+            // activation level either way ("not angry" is not calm).
+            arousal += hit.arousal * m;
           }
           matchedLen = consumedLen;
           break;
@@ -334,6 +337,7 @@ export function detectMood(text) {
               } else {
                 score += hit.weight * 0.85 * m;
                 tense += hit.tense * 0.85 * m;
+                arousal += hit.arousal * 0.85 * m;
               }
               matchedLen = 1;
               break;
@@ -360,9 +364,13 @@ export function detectMood(text) {
   score -= question * 0.25;
   score -= ellipsis * 0.3;
   tense += exclaim * 0.5;
+  // Punctuation is a direct activation cue: '!' energises, a trailing-off
+  // ellipsis deflates.
+  arousal += exclaim * 0.5 - ellipsis * 0.3;
 
   const norm = score / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
   const tenseNorm = tense / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
+  const arousalNorm = arousal / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
 
-  return { mode: modeFor(norm, tenseNorm), normScore: norm, tenseScore: tenseNorm };
+  return { mode: modeFor(norm, arousalNorm), normScore: norm, tenseScore: tenseNorm, arousalScore: arousalNorm };
 }

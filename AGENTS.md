@@ -18,7 +18,7 @@ made changes in this folder; that is the signal to review and commit them.
      no behaviour change · `chore:` housekeeping · `test:` tests
    - Keep the subject line under ~70 characters, imperative mood.
    - End with `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
-4. Run the test suite before committing. All 13 must pass.
+4. Run the test suite before committing. All 17 must pass.
 5. **Commit, then ask before pushing.** The user reviews commits before
    they go to GitHub.
 
@@ -34,13 +34,15 @@ made changes in this folder; that is the signal to review and commit them.
 
 ## Testing
 
-16 zero-dependency Node scripts, no build step, no `package.json`.
+17 zero-dependency Node scripts, no build step, no `package.json`.
 Run them all before a commit.
 
 ```bash
 node test/snapshot.mjs          # regression baseline (pure-logic modules)
 node test/snapshot.mjs --update # accept an intentional behaviour change
 node test/evaluate-mood.mjs     # sentiment accuracy report
+node test/mode-mapping-test.mjs # valence x arousal -> mode invariants
+node test/arousal-test.mjs      # arousal -> tempo invariants
 ```
 
 **Three of the tests need a loader flag** — they run the real `play()`
@@ -55,7 +57,7 @@ node --import ./test/harness/register.mjs test/sync-test.mjs        # 12/12
 Running any of them as plain `node test/<name>.mjs` fails with a loader
 error. The `--import` hook registers `harness/trace-loader.mjs`, which
 wraps `harmony.js` to record melodic decisions without modifying
-production code. The other 13 scripts run directly.
+production code. The other 14 scripts run directly.
 
 There is no aggregate runner because a `package.json` would violate the
 no-dependency rule; just loop over `test/*.mjs` and remember the flag

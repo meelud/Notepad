@@ -23,7 +23,8 @@ let chunks = [];
 let audioBlob = null;
 let harmonyLocked = false;
 let lastHarmonyText = null; // the text harmonyLocked was derived from — auto-invalidates the lock if the text changes
-let sessionTenseScore = 0; // tenseScore of the current text, used to nudge pacing
+let sessionTenseScore = 0; // tenseScore of the current text (melodic tension)
+let sessionArousalScore = 0; // arousalScore of the current text, drives tempo (music/rhythm.js)
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
 let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
@@ -148,6 +149,7 @@ export async function play() {
   if (!harmonyLocked) {
     const harmonyInfo = deriveTextHarmony(text);
     sessionTenseScore = harmonyInfo.tenseScore;
+    sessionArousalScore = harmonyInfo.arousalScore;
     sessionNormScore = harmonyInfo.normScore;
     pieceMotif = generateMotif(hashText(text), sessionTenseScore);
     pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
@@ -310,7 +312,7 @@ export async function play() {
     // any code that can throw, so an error mid-word can't shift later
     // words' beat/chord positions.
     const wordStartMs = virtualMs;
-    virtualMs += wordDurationMs(wlen, sessionTenseScore, isCadence);
+    virtualMs += wordDurationMs(wlen, sessionArousalScore, isCadence);
     const wordEndMs = virtualMs;
 
     if (sp.pos === 1) {
@@ -460,7 +462,7 @@ export async function play() {
 
     // word-length → timing: planned by music/rhythm.js wordDurationMs
     // (base 380ms + 42ms per letter, ±15% tempo nudge from the text's
-    // tenseScore, cadence words 20% longer). The word after this one is
+    // arousalScore via pacingFactorFor, cadence words 20% longer). The word after this one is
     // heard at (timeline origin + its planned onset) plus a small
     // humanising offset. The offset does not accumulate (each onset is
     // jittered around the plan, not around the previous onset), so it
@@ -519,6 +521,7 @@ export function resetHarmony() {
   harmonyLocked = false;
   lastHarmonyText = null;
   sessionTenseScore = 0;
+  sessionArousalScore = 0;
   sessionNormScore = 0;
 }
 

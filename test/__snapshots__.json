@@ -1,54 +1,64 @@
 {
   "mood": {
     "en_simple_joy": {
-      "mode": "major",
+      "mode": "lydian",
       "normScore": 1.1745602737768266,
-      "tenseScore": 0.22587697572631282
+      "tenseScore": 0.22587697572631282,
+      "arousalScore": 0.6324555320336758
     },
     "en_negation": {
       "mode": "minor",
       "normScore": -0.4722463145781585,
-      "tenseScore": 0.0757614408414158
+      "tenseScore": 0.0757614408414158,
+      "arousalScore": 0
     },
     "fa_simple_joy": {
       "mode": "pentMajor",
       "normScore": 0.6415330278717849,
-      "tenseScore": 0
+      "tenseScore": 0,
+      "arousalScore": 0.262445329583912
     },
     "fa_negation": {
       "mode": "minor",
       "normScore": -0.584375,
-      "tenseScore": 0.09374999999999999
+      "tenseScore": 0.09374999999999999,
+      "arousalScore": 0
     },
     "fa_question_mark": {
       "mode": "pentMajor",
       "normScore": 0.27187500000000003,
-      "tenseScore": 0
+      "tenseScore": 0,
+      "arousalScore": 0.23906249999999998
     },
     "fa_comma_pause": {
       "mode": "pentMajor",
       "normScore": 0.584375,
-      "tenseScore": 0
+      "tenseScore": 0,
+      "arousalScore": 0.23906249999999998
     },
     "unicode_ellipsis": {
       "mode": "minor",
       "normScore": -1.1875,
-      "tenseScore": 0.10000000000000002
+      "tenseScore": 0.10000000000000002,
+      "arousalScore": -0.5875
     },
     "ascii_ellipsis": {
       "mode": "minor",
       "normScore": -1.1875,
-      "tenseScore": 0.10000000000000002
+      "tenseScore": 0.10000000000000002,
+      "arousalScore": -0.5875
     },
     "mixed_en_fa": {
       "mode": "lydian",
       "normScore": 1.4930223194106993,
-      "tenseScore": 0.5832118435198044
+      "tenseScore": 0.5832118435198044,
+      "arousalScore": 1.1197667395580244
     },
     "empty_string": {
       "mode": "mixolydian",
       "normScore": 0,
-      "tenseScore": 0
+      "tenseScore": 0,
+      "arousalScore": 0
     }
   },
   "tokenize": {
@@ -251,7 +261,7 @@
   },
   "harmony": {
     "en_simple_joy": {
-      "mood": "major",
+      "mood": "lydian",
       "root": 138.59131548843604,
       "scaleLength": 7
     },

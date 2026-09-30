@@ -36,6 +36,7 @@ const CONTRARY_MOTION_ENABLED = true; // mirrors player.js
 export function simulateText(text) {
   const harmonyInfo = deriveTextHarmony(text);
   const sessionTenseScore = harmonyInfo.tenseScore;
+  const sessionArousalScore = harmonyInfo.arousalScore;
   const sessionNormScore = harmonyInfo.normScore;
   const pieceMotif = generateMotif(hashText(text), sessionTenseScore);
   const pieceIntentions = deriveIntentions(text);
@@ -94,7 +95,7 @@ export function simulateText(text) {
 
     const wlen = (tok.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
     const wordStartMs = virtualMs;
-    virtualMs += wordDurationMs(wlen, sessionTenseScore, isCadence);
+    virtualMs += wordDurationMs(wlen, sessionArousalScore, isCadence);
 
     if (sp.pos === 1) {
       sentenceCycle++;

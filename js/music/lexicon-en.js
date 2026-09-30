@@ -1,10 +1,18 @@
 /**
  * lexicon-en.js
  * English-language emotion lexicon — base word/weight/tense mappings.
+ *
+ * Each category carries three hand-set numbers:
+ *   weight  — valence (negative = dark, positive = bright)
+ *   tense   — musical tension (drives leaps, motif shape, cadence)
+ *   arousal — activation, Russell's (1980) second circumplex axis
+ *             (drives tempo and how far the mode intensifies). Kept apart
+ *             from `tense` because they disagree: sadness is low-arousal
+ *             but slightly tense; joy is high-arousal but not tense.
  * Persian colloquial words are merged at runtime from lexicon-fa-colloquial.js.
  */
 export const EMOTION_LEXICON = {
-  joy: { weight: 1.1, tense: 0, words: [
+  joy: { weight: 1.1, tense: 0, arousal: 0.45, words: [
 
     'giddy up','buzzing right now','over the top happy','on top of the world today',
     'good times','feeling blessed','vibing hard','riding high','all smiles today',
@@ -37,7 +45,7 @@ export const EMOTION_LEXICON = {
     'a flicker of light','a rare kind of stillness','something almost weightless','a brief clearing of the noise',
     'a signal breaking through clean',
   ]},
-  love: { weight: 1.0, tense: 0, words: [
+  love: { weight: 1.0, tense: 0, arousal: 0.1, words: [
 
     'stupid in love','crazy about you','can’t get enough of you','you’re my person',
     'my whole heart','soft for you','simping hard','my favorite human',
@@ -69,7 +77,7 @@ export const EMOTION_LEXICON = {
     'a quiet devotion','tangled and tethered','the gravity between us','a soft collision','held in orbit','a low hum of belonging',
     'a frequency only we share','a quiet gravity between two people',
   ]},
-  calm: { weight: 0.7, tense: -0.3, words: [
+  calm: { weight: 0.7, tense: -0.3, arousal: -0.5, words: [
 
     'taking it slow','no rush','breathing easy','settling in','finding my center',
     'letting go of it','not stressing','it is what it is','going with the flow',
@@ -97,7 +105,7 @@ export const EMOTION_LEXICON = {
     'weightless and still','a hush over everything','the quiet after','a stillness in the static','floating just above it all',
     'a signal finally clear','the static finally settling',
   ]},
-  hope: { weight: 0.8, tense: -0.1, words: [
+  hope: { weight: 0.8, tense: -0.1, arousal: 0.1, words: [
 
     'better days coming','light at the end','it’s gonna work out','trust the timing',
     'good things coming','patience pays off','on the come up','glow up incoming',
@@ -128,7 +136,7 @@ export const EMOTION_LEXICON = {
     'a flicker in the dark','a pulse still beating','not broken yet','holding onto static hope','a thin light through the cracks','still breathing','a signal trying to get through',
     'a frequency worth waiting for','something still transmitting','a door left slightly open',
   ]},
-  sadness: { weight: -1.0, tense: 0.1, words: [
+  sadness: { weight: -1.0, tense: 0.1, arousal: -0.4, words: [
 
     'in my feelings','not my best day','running on empty','emotionally drained',
     'heavy heart today','just not okay right now','struggling a bit','off today',
@@ -159,7 +167,7 @@ export const EMOTION_LEXICON = {
     'aching hollow','quietly breaking','worn thin','faded photograph','paper thin','a weight i carry','tired of pretending','a slow unraveling','muted grief','held together loosely','a bruise that wont fade','carrying it quietly','the ache of almost','a hollow kind of quiet',
     'a quiet kind of drowning','the static between us','a voice fading out','held loosely by threads',
   ]},
-  fear: { weight: -0.9, tense: 0.5, words: [
+  fear: { weight: -0.9, tense: 0.5, arousal: 0.7, words: [
 
     'freaking out a little','nerves are shot','on edge today','can’t shake this feeling',
     'spiraling a bit','overthinking everything','worried sick','bracing for impact',
@@ -185,7 +193,7 @@ export const EMOTION_LEXICON = {
     'paranoid','watched','surveilled','trapped in the wires','glass walls closing in','a creeping dread','static in my head','losing signal','out of frequency','a shadow just behind me','the hum before the storm',
     'a pulse i cant slow down','the walls have ears tonight','a signal i cant escape',
   ]},
-  anger: { weight: -0.7, tense: 1.0, words: [
+  anger: { weight: -0.7, tense: 1.0, arousal: 1.0, words: [
 
     'not today','done with this nonsense','over this already','beyond frustrated',
     'at my limit','last nerve gone','absolutely done','over it completely',
@@ -212,7 +220,7 @@ export const EMOTION_LEXICON = {
     'a slow burn','static rage','a fracture in the calm','something breaking quietly','a low simmering fury',
     'a hum turning into a scream','static building into noise',
   ]},
-  dark: { weight: -0.8, tense: 0.4, words: [
+  dark: { weight: -0.8, tense: 0.4, arousal: 0.3, words: [
 
     'existential dread','void inside','running on fumes','barely holding it together',
     'nothing feels real','going through it','dark place right now','can’t see a way out',
@@ -241,7 +249,7 @@ export const EMOTION_LEXICON = {
     'alienated','disconnected','fragmented','unraveling','weightless','suffocating','claustrophobic','erased','invisible','collapsing inward','ghostlike','colourless','fading signal','lost transmission','white noise','flatline','wires crossed','a slow erosion','peeling paint and static','a room without windows','the hum of dead air','nothing left to say','a body made of static','the space between heartbeats','a signal going dark','breathing static','no alarms and no surprises',
     'a slow drift into static','the walls closing quietly','a dial tone and nothing else','a photograph left in the rain','the shape of an absence','a low hum of nothing',
   ]},
-  nostalgia: { weight: -0.2, tense: -0.1, words: [
+  nostalgia: { weight: -0.2, tense: -0.1, arousal: -0.3, words: [
 
     'those were the days','simpler times fr','miss the old days','throwback feels',
     'takes me back','old school vibes','remember this','flashback moment',
@@ -270,7 +278,7 @@ export const EMOTION_LEXICON = {
     'a fading polaroid','ghost of a memory','the weight of yesterday','a room that used to be','echoes of a life before','a static memory','the shape of what was',
     'a voice i used to know','the room still smells like before','a signal from somewhere i used to be',
   ]},
-  vice: { weight: -0.3, tense: 0.2, words: [
+  vice: { weight: -0.3, tense: 0.2, arousal: 0.3, words: [
 
     'one more round','just one more drink','skip the gym again','bad habit again',
     'cheat day energy','no self control today','indulging a bit too much','impulse buy again',
@@ -297,7 +305,7 @@ export const EMOTION_LEXICON = {
     'no chill tonight','yolo','sending it','bad decisions szn','regret nothing','living dangerously','treat yourself','cheat day','no regrets tonight',
     'indulging','giving in','tempted','cant resist','slipping up','bad influence','overdoing it','losing control','addicted to it','cant stop','one more time','breaking the rule', 'indulge',
   ]},
-  casual: { weight: 0, tense: 0, words: [
+  casual: { weight: 0, tense: 0, arousal: 0, words: [
 
     'no biggie','not a big deal','it’s whatever','meh either way','doesn’t matter much',
     'six of one','either works','up to you really','your call','no preference tbh',
@@ -323,7 +331,7 @@ export const EMOTION_LEXICON = {
     'lowkey','highkey','fr fr','say less','it\'s giving','slay','periodt','tbh ngl','vibe check','same energy','big mood','felt that','literally me',
     'meh','whatever man','chill out','take it easy','moving along','same as always','nothing much','just here',
   ]},
-  confusion: { weight: 0, tense: 0.3, words: [
+  confusion: { weight: 0, tense: 0.3, arousal: 0.2, words: [
 
     'not following','lost the thread','what’s happening here','totally lost rn',
     'brain fog today','can’t wrap my head around this','doesn’t add up','still processing this',
@@ -350,7 +358,7 @@ export const EMOTION_LEXICON = {
     'lost signal','fractured thoughts','a fog that wont lift','disoriented in the crowd','white noise in my mind','cant find the frequency','signal and noise indistinguishable','a maze with no exit',
     'a dial tuned to nothing','the noise where the answer should be',
   ]},
-  surprise: { weight: 0.4, tense: 0.5, words: [
+  surprise: { weight: 0.4, tense: 0.5, arousal: 0.7, words: [
 
     'wasn’t expecting that','out of left field fr','plot twist for real','didn’t see that one coming',
     'that came out of nowhere','absolutely floored rn','no way that happened','wild turn of events',
