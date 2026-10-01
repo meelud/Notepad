@@ -1,13 +1,52 @@
+// ─── Arabic-script letter folding ───────────────────────────────
+/**
+ * Folds the Arabic yeh/kaf variants onto their Persian forms, U+064A -> U+06CC
+ * (also U+0649) and U+0643 -> U+06A9.
+ *
+ * These are four DIFFERENT codepoints that look identical on screen. Persian is
+ * routinely typed with the Arabic ones — Arabic keyboard layouts, older
+ * Iranian keyboards, and text pasted from Arabic sources all produce them — and
+ * a lexicon entry written with U+06CC never matches a token carrying U+064A.
+ * That is a whole-word mismatch, not a small score difference: measured on
+ * "هیچی که میگم درست نیست", folding drops tenseScore from 0.094 to 0 and the
+ * first played note from 523.8Hz to 330Hz, because the word stops being
+ * recognized at all.
+ *
+ * Folding is done at the START of tokenize() and at the top of detectMood(),
+ * so both the mood lookup and the playback path see identical tokens. Folding
+ * later, inside the lexicon, would fix only the lookup and leave the note
+ * sequence, the RNG seed (hashText) and the word lengths derived from the raw
+ * tokens still keyed on the Arabic spelling — the two would then disagree.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+export function foldPersian(s) {
+  return s
+    .replace(/[\u064A\u0649]/g, '\u06CC')
+    .replace(/\u0643/g, '\u06A9');
+}
+
 // ─── Tokenizer ──────────────────────────────────────────────────
 /**
  * Splits text into tokens (words, spaces, punctuation).
  * Each word token gets:
  *   - sentenceType: 'statement' | 'question' | 'exclaim'
  *   - paraPos: 'start' | 'middle' | 'end' (based on word position)
+ *
+ * The text is folded with foldPersian() first, so a word typed with Arabic
+ * yeh/kaf produces the same token as its Persian spelling. Both the word's
+ * lexicon lookup and the note length derived from it then agree.
+ *
+ * Note: token offsets are indexes into the FOLDED text. buildRender() and
+ * playPunctuation() are given the same folded text by the caller, so the
+ * highlight still lines up; see test/arabic-fold-test.mjs.
+ *
  * @param {string} text
  * @returns {Array<{type: string, start: number, end: number, text: string, sentenceType?: string, paraPos?: string}>}
  */
 export function tokenize(text) {
+  text = foldPersian(text);
   const tokens = [];
   let i = 0;
 

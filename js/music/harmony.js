@@ -1,6 +1,7 @@
 import { MODE_ORDER, buildScale, MODE_OFFSETS } from './scales.js';
 import { detectMood } from './mood.js';
 import { rnd } from '../utils/rng.js';
+import { foldPersian } from '../utils/text.js';
 
 // ─── State ──────────────────────────────────────────────────────
 export let currentScale = buildScale(110.00, 'minor');
@@ -20,6 +21,14 @@ const ROOT_CANDIDATES_MID = Array.from({ length: 12 }, (_, i) => noteFreq(i));
  * @returns {number} unsigned 32-bit hash
  */
 export function hashText(text) {
+  // foldPersian() here rather than trusting every caller to have done it.
+  // This hash seeds the RNG, picks the mode, builds the motif and drives the
+  // chord clock, so if it ever saw a raw Arabic-codepoint spelling the whole
+  // piece would differ from the Persian spelling of the same sentence — and
+  // the difference would be invisible, since both pieces are valid. Folding
+  // inside is idempotent, so the callers that already fold (play(),
+  // tokenize(), detectMood()) pay nothing for it.
+  text = foldPersian(text);
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
   return h;

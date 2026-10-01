@@ -14,7 +14,7 @@ import { deriveComposition } from './music/composition.js';
 import { seedRng, rrnd as rnd, rpick as pick } from './utils/rng.js';
 import { velocityRange, lengthRange } from './music/dynamics.js';
 import { barIndexAt, isStrongBeatAt, punctPauseFor, wordDurationMs, createChordClock } from './music/rhythm.js';
-import { tokenize, esc, buildRender, sleep } from './utils/text.js';
+import { tokenize, esc, buildRender, sleep, foldPersian } from './utils/text.js';
 import { findPersonaMessage, showPersonaToast, isRobbieText, showRobbieMessage } from './persona.js';
 
 // ─── State ──────────────────────────────────────────────────────
@@ -132,7 +132,13 @@ function familyForMood(normScore) {
  * Records output to a Blob (audio/webm) for later save.
  */
 export async function play() {
-  const text = editor.value;
+  // Fold once, here, and let everything downstream see the folded text:
+  // tokenize() also folds, so the token offsets below index into `text`
+  // exactly, and buildRender() highlights the right slice. Folding at this
+  // single entry point is what makes an Arabic-codepoint text produce the
+  // same mood, the same RNG seed (hashText), the same mode and the same note
+  // sequence as its Persian spelling — see test/arabic-fold-test.mjs.
+  const text = foldPersian(editor.value);
   if (!text.trim()) return;
 
   unlockIOSAudio();

@@ -1,4 +1,5 @@
 import { EMOTION_LEXICON } from './lexicon-en.js';
+import { foldPersian } from '../utils/text.js';
 import { FA_LEXICON_COLLOQUIAL } from './lexicon-fa-colloquial.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
 
@@ -33,6 +34,17 @@ export { CONTRAST_WORDS };
   }
 })();
 
+/**
+ * Lower-case a lexicon entry and collapse it to space-separated word tokens, so
+ * lookup is insensitive to case and punctuation.
+ *
+ * Arabic yeh/kaf are folded by foldPersian() on the TEXT side instead, at the
+ * top of tokenize() and detectMood(): normalizePhrase only ever sees lexicon
+ * entries, which are all written in Persian codepoints, so folding them here
+ * alone would fix the lookup while leaving the typed text, the RNG seed and
+ * the token offsets on a different spelling. Doing both sides together is what
+ * makes the two spellings produce the same piece of music.
+ */
 function normalizePhrase(str) {
   return (str.toLowerCase().match(/[a-zA-Zا-ی]+/g) || []).join(' ');
 }
@@ -135,6 +147,14 @@ export function wordSentimentSign(word) {
  *   `consumedLen` semantics exactly.
  */
 export function scanPhraseMatches(words) {
+  // Fold here as well as in tokenize()/detectMood(). This function is the
+  // single entry point to the lexicon, and three modules call it with words
+  // they extracted themselves (intention.js's clauseSentiment and
+  // deriveSemanticSpans, composition.js's sectionSentimentMagnitude), so
+  // folding only at their callers would mean one of them being forgotten.
+  // foldPersian() is strictly 1:1 in length, so every index below still
+  // refers to the caller's original word array.
+  words = words.map(foldPersian);
   const matches = [];
   let i = 0;
   while (i < words.length) {
@@ -253,7 +273,9 @@ export function modeFor(norm, tense) {
 }
 
 export function detectMood(text) {
-  const lower = text.toLowerCase().replace(/n['’]t\b/g, ' not');
+  // foldPersian() first, so a text typed with Arabic yeh/kaf scores identically
+  // to its Persian spelling — in the mood, and in the notes derived from it.
+  const lower = foldPersian(text).toLowerCase().replace(/n['’]t\b/g, ' not');
   const totalWords = (lower.match(/[a-zA-Zا-ی]+/g) || []).length;
   let score = 0, tense = 0, arousal = 0;
 
