@@ -161,9 +161,9 @@ export const EMOTION_LEXICON = {
     'you make me weak','you complete me','forever and always','ride or die love',
     'my ride or die','can’t live without you','you’re it for me','endgame',
     'my constant','home to me','you feel like home','safe with you',
-    'love','loving','adore','affection','sweetheart','darling','cherish','beloved','romance',
+    'love','loving','adore','affection','cherish','beloved','romance',
     'kiss','embrace','tender','devotion','soulmate','warmth','caring',
-    'crush','smitten','infatuated','babe','honey','boo','cuddle','snuggle','flirt','flirting',
+    'crush','smitten','infatuated','boo','cuddle','snuggle','flirt','flirting',
     'romantic','valentine','partner',
     'عشق','دلبر','محبوب','دوست‌داشتن','عاشق','نازنین','مهربان','صمیمی','محبت','دلداده',
     'head over heels','madly in love','deeply in love','crazy about','wild about',
@@ -186,6 +186,41 @@ export const EMOTION_LEXICON = {
     'a quiet devotion','tangled and tethered','the gravity between us','a soft collision','held in orbit','a low hum of belonging',
     'a frequency only we share','a quiet gravity between two people',
   ]},
+
+  // ── ENDEARMENTS ──────────────────────────────────────────────────
+  // A term of address, not a statement of feeling. "Darling, are you okay?"
+  // is not necessarily warmth; it is a person speaking to someone they care
+  // about, and the sentence around it carries the actual emotion. So the
+  // weight is deliberately below love's +1.0: an endearment on its own is
+  // warmth, not passion.
+  //
+  // The arousal is slightly NEGATIVE and the valence is modest. Speaking to
+  // someone you love is a settled, quiet state — it lowers urgency rather than
+  // raising it. Scoring it as arousal-positive would make "dear, listen to me"
+  // play faster and louder, which is excitement, and that is the wrong feeling.
+  //
+  // tense -0.1 because an endearment sits in the present tense: it is a word
+  // for right now, not a memory or an anticipation.
+  endearment: { weight: 0.7, tense: -0.1, arousal: -0.1, words: [
+
+    'darling','my love','sweetheart','honey','my darling','my sweetheart','my honey',
+    'عزیزم','عشقم','جانم','قربونت','عزیز دلم','جان دلم','قربونت برم',
+  ]},
+
+  // Ambiguous ones. "baby" and "dear" and "babe" are endearments between
+  // lovers, and equally what you say to a child, a friend being casual, or
+  // someone being sarcastic. Half the weight, because the surrounding sentence
+  // has to decide and this word will not overrule it.
+  //
+  // "baby" is deliberately NOT added to love: "the baby is crying" and "my
+  // baby is sick" are about a child and must stay negative, and a word that
+  // appears in both readings cannot be filed under either.
+  endearment_soft: { weight: 0.35, tense: -0.1, arousal: -0.1, words: [
+
+    'baby','dear','babe','babies','my dear',
+    'بابا','عزیز','جان','ملقا',
+  ]},
+
   calm: { weight: 0.7, tense: -0.3, arousal: -0.5, words: [
 
     'taking it slow','no rush','breathing easy','settling in','finding my center',

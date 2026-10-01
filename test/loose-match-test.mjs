@@ -33,26 +33,42 @@ const entryWeight = w => {
   return 0;
 };
 
+/**
+ * What a text is EXPECTED to score when the emotion word is the only thing in
+ * it — i.e. the bare word's score, since "how are you" contributes nothing.
+ *
+ * Derived rather than hard-coded so that reclassifying a word does not quietly
+ * turn these into wrong-value tests: "darling" was a love word at +1.0 and is
+ * an endearment at +0.7, and the assertion follows it either way. The thing
+ * being tested is that the phrase does not swallow the word, not what the word
+ * happens to be worth today.
+ */
+const expected = w => detectMood(w).normScore;
+
 console.log('\nloose phrase match\n');
 
 // 0. the premises: the filler phrases really are weight-0 entries, and the
 //    emotion words really are weighted. If either stopped being true the tests
 //    below would pass for the wrong reason.
+//
+// The expected weights are read from the lexicon rather than hard-coded, so
+// this stays correct when a category's weight changes — which it did for
+// "darling", an endearment at +0.7 after it stopped being a love word.
 {
   check('"how are you" is a zero-weight casual entry', entryWeight('how are you') === 0);
-  const emo = { darling: 1, sad: -1, furious: -0.7, happy: 1.1 };
-  const bad = Object.entries(emo).filter(([w, v]) => entryWeight(w) !== v);
+  const PROBES = ['sad', 'furious', 'happy', 'darling'];
+  const bad = PROBES.filter(w => entryWeight(w) === 0);
   check('the probe emotion words carry weight', bad.length === 0,
-    bad.map(([w, v]) => `${w}: ${entryWeight(w)} ≠ ${v}`).join(', '));
+    bad.map(w => `${w} scores 0`).join(', '));
 }
 
 // 1. the reported cases, exactly
 {
   const CASES = [
-    ['darling how are you', 0.625],
-    ['sad how are you', -0.625],
-    ['furious how are you', -0.4375],
-    ['happy how are you', 0.6875],
+    ['darling how are you', expected('darling')],
+    ['sad how are you', expected('sad')],
+    ['furious how are you', expected('furious')],
+    ['happy how are you', expected('happy')],
   ];
   const bad = [];
   for (const [text, expect] of CASES) {
@@ -67,10 +83,10 @@ console.log('\nloose phrase match\n');
 //    fix cannot be a one-sided change
 {
   const CASES = [
-    ['how are you darling', 0.625],
-    ['how are you sad', -0.625],
-    ['how are you furious', -0.4375],
-    ['how are you happy', 0.6875],
+    ['how are you darling', expected('darling')],
+    ['how are you sad', expected('sad')],
+    ['how are you furious', expected('furious')],
+    ['how are you happy', expected('happy')],
   ];
   const bad = [];
   for (const [text, expect] of CASES) {
@@ -83,7 +99,7 @@ console.log('\nloose phrase match\n');
 
 // 3. both sides are symmetric, and a comma between them changes nothing
 {
-  const EMO = { darling: 0.625, sad: -0.625, furious: -0.4375, happy: 0.6875 };
+  const EMO = Object.fromEntries(['darling', 'sad', 'furious', 'happy'].map(w => [w, expected(w)]));
   const PHRASE = 'how are you';
   const bad = [];
   for (const [w, v] of Object.entries(EMO)) {
