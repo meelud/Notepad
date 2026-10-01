@@ -26,6 +26,20 @@ import { seedRng } from '../js/utils/rng.js';
 import { barIndexAt, isStrongBeatAt, punctPauseFor, wordDurationMs, createChordClock } from '../js/music/rhythm.js';
 import { tokenize } from '../js/utils/text.js';
 
+// These mirror player.js's own flags. They must agree: the sim's compState
+// lines have NO null-guard where player.js's do, so the two files only agree
+// today because both flags are true everywhere. Turn one off here and the
+// paths diverge — which is exactly the latent asymmetry player-parity cannot
+// currently reach, because with the flags all true compState is never null in
+// either file. There is no text that triggers it, so no text can be added to
+// the parity corpus; the guard has to be structural instead.
+//
+// Asserted by test/player-sim-parity-mirror.mjs, which reads both files.
+const MUSICAL_INTENTION_ENABLED = true;
+const COMPOSITION_LAYER_ENABLED = true;
+const REGISTER_BIAS_ENABLED = true;
+const SEMANTIC_STABILITY_ENABLED = true;
+
 const SEMANTIC_WEIGHT_THRESHOLD = 0.5;
 const CONTRARY_MOTION_ENABLED = true; // mirrors player.js
 
@@ -39,9 +53,9 @@ export function simulateText(text) {
   const sessionArousalScore = harmonyInfo.arousalScore;
   const sessionNormScore = harmonyInfo.normScore;
   const pieceMotif = generateMotif(hashText(text), sessionTenseScore);
-  const pieceIntentions = deriveIntentions(text);
-  const pieceSemanticSpans = deriveSemanticSpans(text); // see js/player.js's third phrase-awareness fix
-  const pieceComposition = deriveComposition(text);
+  const pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
+  const pieceSemanticSpans = SEMANTIC_STABILITY_ENABLED ? deriveSemanticSpans(text) : []; // see js/player.js's third phrase-awareness fix
+  const pieceComposition = COMPOSITION_LAYER_ENABLED ? deriveComposition(text) : null;
   seedRng(hashText(text)); // after all derive*() calls, exactly as in player.js
 
   const tokens = tokenize(text);
@@ -124,9 +138,11 @@ export function simulateText(text) {
 
     let note;
     const progress = totalWordsInText > 1 ? wordGlobalIndex / (totalWordsInText - 1) : 0;
-    const compState = pieceComposition.getStateAt(progress);
-    const combinedRegisterBias = Math.max(-1, Math.min(1, intention.contourBias + compState.registerTendency * 0.5));
-    const motifAllowed = compState.motifActive;
+    const compState = COMPOSITION_LAYER_ENABLED && pieceComposition ? pieceComposition.getStateAt(progress) : null;
+    const combinedRegisterBias = REGISTER_BIAS_ENABLED
+      ? Math.max(-1, Math.min(1, intention.contourBias + (compState ? compState.registerTendency * 0.5 : 0)))
+      : 0;
+    const motifAllowed = compState ? compState.motifActive : true;
 
     let isStrongBeat = null;
     let chordArg = null, contraryArg = null;
@@ -150,7 +166,7 @@ export function simulateText(text) {
       const effChordDeg = (isStrongBeat || isSemanticallyStable) ? chordClock.degreeAtBar(barIdx) : null;
       chordArg = effChordDeg;
       contraryArg = CONTRARY_MOTION_ENABLED ? chordClock.directionAtBar(barIdx) : 0;
-      const effectiveTense = Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + compState.tension * 0.25));
+      const effectiveTense = Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + (compState ? compState.tension * 0.25 : 0)));
       const isDisruptionNow = intention.isDisruption && isFirstWordOfClause;
       const prevDegreeBeforeThisNote = lastNote ? lastNote.degree : null;
       note = arbitrateMelodyNote(
@@ -172,7 +188,7 @@ export function simulateText(text) {
       lastInterval: note.lastInterval, isCadence, isStrongBeat, chordArg, contraryArg, startMs: wordStartMs,
       sentenceType: tok.sentenceType, wordIdx: wordGlobalIndex,
       cadenceStrength: intention.cadenceStrength, path,
-      compRole: compState.role, compTension: compState.tension, compEnergy: compState.energy,
+      compRole: compState ? compState.role : null, compTension: compState ? compState.tension : 0, compEnergy: compState ? compState.energy : 0,
       progress,
       // the LOCAL, per-word effective tension that actually fed into this
       // note's decision (session base + globalTensionBias's arc + a slice
@@ -180,7 +196,7 @@ export function simulateText(text) {
       // why this, not sessionTenseScore, is the right unit for testing
       // the tense->leap design intent.
       effectiveTense: path === 'arbitration'
-        ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + compState.tension * 0.25))
+        ? Math.max(0, Math.min(1, sessionTenseScore + globalTensionBias(progress) + (compState ? compState.tension * 0.25 : 0)))
         : null,
     });
 
