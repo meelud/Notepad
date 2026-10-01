@@ -38,11 +38,20 @@ export { CONTRAST_WORDS };
  * Lower-case a lexicon entry and collapse it to space-separated word tokens, so
  * lookup is insensitive to case and punctuation.
  *
- * The zero-width characters are dropped so a ZWNJ-joined word matches its
- * unjoined spelling, and the Arabic yeh/kaf are folded — both by delegating to
- * extractWords() in utils/text.js, so this and every other extractor in the
- * codebase cannot drift apart. They are NOT dropped in tokenize(), whose
- * offsets index the string buildRender() is handed.
+ * Delegates entirely to extractWords() in utils/text.js: lower-case, the
+ * Arabic yeh/kaf folded, the zero-width characters dropped, and the letter
+ * range taken from WORD_RE rather than kept here.
+ *
+ * That last part is the whole point. This function used to carry a PRIVATE
+ * copy of the letter range, over U+0621-U+06CC, while the text extractors used
+ * ا-ی. Six letters below U+0627 — آ ء أ إ ؤ ئ — were therefore dropped from
+ * text but kept in the lexicon, so 119 entries could never be matched by any
+ * text spelling them as Persian does. Sharing WORD_RE makes the divergence
+ * impossible rather than merely fixed once; test/lexicon-round-trip-test.mjs
+ * proves the two agree for every entry.
+ *
+ * The zero-width characters are NOT dropped in tokenize(), whose offsets index
+ * the string buildRender() is handed.
  *
  * Arabic yeh/kaf are folded by foldPersian() on the TEXT side instead, at the
  * top of tokenize(), detectMood(), hashText() and scanPhraseMatches():
@@ -52,9 +61,7 @@ export { CONTRAST_WORDS };
  * spelling.
  */
 function normalizePhrase(str) {
-  return (str.toLowerCase()
-    .replace(/[\u200C\u200F\u200E]/g, '')
-    .match(/[a-zA-Z\u0621-\u06CC]+/g) || []).join(' ');
+  return extractWords(str).join(' ');
 }
 
 let MAX_PHRASE_LEN = 1;

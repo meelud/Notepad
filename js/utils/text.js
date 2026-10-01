@@ -59,18 +59,33 @@ export function foldPersian(s) {
  * @returns {string[]}
  */
 /**
- * The letter range is ا-ی, exactly as it has always been, plus U+200C. NOT
- * widened to cover آ (U+0622).
+ * The letter range is U+0621-U+06CC, the SAME range the lexicon is keyed over,
+ * plus U+200C. It was ا-ی (U+0627-U+06CC), which silently dropped six letters
+ * that sit below it:
  *
- * آ is a known, separate bug: it sits below the ا-ی range, so "آرامش" splits
- * into "رامش" and matches nothing, even though the lexicon entry is written
- * "آرامش". Adding آ to this pattern fixes that — and measurably so, three gold
- * texts move quadrant — but it is not this change, and it must not ride along
- * silently inside a commit whose whole claim is that texts without a ZWNJ are
- * untouched. The two bugs are the same shape, and whoever fixes آ should
- * measure it the way test/zwnj-word-test.mjs measures this one.
+ *   ء U+0621  أ U+0623  إ U+0625  ؤ U+0624  ئ U+0626  آ U+0622
+ *
+ * The damage was total, not partial. "آرامش" split into "رامش" and matched
+ * nothing, while the lexicon entry is written "آرامش" — so every Persian word
+ * spelled with آ was invisible: آرام, آرامش, آروم, آسمون, آواز, آرزو. Measured
+ * on "همه چی آرومه", "آرامش دارم" and "حس آرامش می‌کنم": all three scored
+ * 0.00, i.e. neutral, which for calm-positive text means the valence is lost
+ * too. 119 of the 3675 lexicon entries were unreachable from any text that
+ * spelled them the way Persian actually spells them.
+ *
+ * This is the same bug as the ZWNJ one, one character up, and it survived that
+ * fix precisely because nobody checked the ranges against each other. So the
+ * range is now stated once, here, and normalizePhrase() reads this same
+ * pattern instead of keeping a private copy of the old one — see
+ * test/lexicon-round-trip-test.mjs, which proves the two agree for all 3675
+ * entries.
+ *
+ * The hamza carriers (ء أ إ ؤ ئ) are included on purpose even though they are
+ * not Persian letter forms. Persian borrows them freely — مؤثر, مسئله,
+ * سؤال — and excluding them split those words mid-token. A narrower range
+ * here is not "more correct Persian", it is fewer words found.
  */
-export const WORD_RE = /[a-zA-Zا-ی‌]+/g;
+export const WORD_RE = /[a-zA-Z\u0621-\u06CC\u200C]+/g;
 
 /**
  * Strips the zero-width characters (ZWNJ, RLM, LRM). See normalizePhrase()
