@@ -10,7 +10,116 @@
  *             from `tense` because they disagree: sadness is low-arousal
  *             but slightly tense; joy is high-arousal but not tense.
  * Persian colloquial words are merged at runtime from lexicon-fa-colloquial.js.
+ *
+ * AROUSAL: CATEGORY DEFAULTS AND THE RULE THEY FOLLOW
+ * ────────────────────────────────────────────────────
+ * A category's `arousal` is its DEFAULT and must describe what most of its
+ * entries describe. A single number is only honest when the category is
+ * internally consistent, and some of these are not: `dark` held a default of
+ * +0.30 while most of its entries are depletion rather than agitation, so
+ * grief was scored as high-arousal and played fast and loud, which is the
+ * opposite of how grief sounds.
+ *
+ * The rule, applied to every entry of `dark`, `vice` and `confusion`:
+ *
+ *     DEPLETION / ABSENCE / NUMBNESS / EXHAUSTION  → arousal <= 0
+ *         nothingness, hollow, empty, numb, fading, gone, worn out, tired,
+ *         resigned, alone, slow, quiet despair, stillness
+ *     THREAT / URGENCY / AGITATION / STRUGGLE      → arousal > 0
+ *         desperate, trapped, suffocating, panic, being chased, breaking,
+ *         struggling against something
+ *
+ * Where a category holds both, the default follows the MAJORITY and the
+ * minority is listed in AROUSAL_OVERRIDES below, keyed by the exact
+ * lexicon entry. Deciding by rule and by the word's meaning — never by
+ * which words happen to appear in an evaluation set — is the point: tuning
+ * to the set would just move the fitting from one table to another.
+ *
+ * `dark` and `vice` and `confusion` are the three that were mixed. The rest
+ * were already internally consistent and keep a plain default.
  */
+
+/**
+ * Per-word arousal overrides, keyed by the exact entry as it appears in
+ * the category below. Each is the minority kind inside a category whose
+ * default is the other kind.
+ */
+export const AROUSAL_OVERRIDES = {
+  // `dark` defaults LOW: most of it is depletion, numbness or despair that
+  // drains rather than agitates. These are the actively-agitated minority.
+  dark: {
+    'desperate': 0.6,
+    'living nightmare': 0.6,
+    'waking nightmare': 0.5,
+    'walking through fire': 0.6,
+    'trapped in darkness': 0.6,
+    'stuck in the dark': 0.5,
+    'crushing weight': 0.4,
+    'drowning': 0.5,
+    'sinking': 0.4,
+    'falling': 0.3,
+    'collapsing': 0.4,
+    'crumbling': 0.3,
+    'disintegrating': 0.3,
+    'suffocating': 0.5,
+    'claustrophobic': 0.5,
+    'existential dread': -0.25,
+    'existential crisis': 0.2,
+    'the walls closing quietly': 0.4,
+    'nihilistic': 0.3,
+    'horror show': 0.5,
+    'going through hell': 0.6,
+    'shattered beyond repair': 0.3,
+    'broken beyond repair': 0.3,
+    'dying': 0.4,
+    'waking nightmare': 0.5,
+  },
+  // `vice` defaults LOW: most entries are habit and low-grade neglect, which
+  // is not the same as being agitated. The rest are acute, and those are
+  // the override.
+  vice: {
+    'yolo energy': 0.5,
+    'bad decisions tonight': 0.3,
+    'losing control': 0.5,
+    'lost control': 0.5,
+    'no self control': 0.5,
+    'no self control today': 0.5,
+    'addicted to it': 0.5,
+    'addicted': 0.5,
+    'cant stop': 0.5,
+    'overdoing it': 0.4,
+    'bad decisions szn': 0.3,
+    'living dangerously': 0.4,
+  },
+  // `confusion` defaults LOW: most entries are disorientation and a fog,
+  // which is passive.
+  // `confusion` is almost entirely passive fog: "not following", "brain
+  // fog", "lost the thread". There is no agitated minority worth naming
+  // here, so the category carries its low default and no overrides.
+  // Persian entries, same rule. The FA word lists merge into these same
+  // categories at runtime, so they inherit the default; only the
+  // actively-agitated minority needs naming, keyed 'fa:<category>'.
+  'fa:dark': {
+    'خفه شدم تو این وضع': 0.5,
+    'له شدم زیر فشار': 0.4,
+    'زیر فشار له شدم': 0.4,
+    'زیر فشار شکستم': 0.4,
+    'زیر فشار نابود شدم': 0.5,
+    'داغونم': 0.3,
+    'داغون شدم کامل': 0.3,
+    'ویران شدم': 0.3,
+    'نابود شدم': 0.3,
+    'مونسترا تو دلمه': 0.4,
+    'یه دیوار که آروم آروم بهم نزدیک میشه': 0.4,
+    'تو تاریکی گیر کردم': 0.4,
+    'از پا در اومدم': 0.3,
+    'از درون فروپاشیدم': 0.4,
+    'فروپاشی': 0.4,
+  },
+  'fa:vice': {
+    'بازم زیادی خوردم': 0.3,
+  },
+};
 export const EMOTION_LEXICON = {
   joy: { weight: 1.1, tense: 0, arousal: 0.45, words: [
 
@@ -220,7 +329,9 @@ export const EMOTION_LEXICON = {
     'a slow burn','static rage','a fracture in the calm','something breaking quietly','a low simmering fury',
     'a hum turning into a scream','static building into noise',
   ]},
-  dark: { weight: -0.8, tense: 0.4, arousal: 0.3, words: [
+  // default LOW: see the arousal rule in the header. Most of this category is
+  // depletion, not agitation; the agitated minority is in AROUSAL_OVERRIDES.
+  dark: { weight: -0.8, tense: 0.4, arousal: -0.35, words: [
 
     'existential dread','void inside','running on fumes','barely holding it together',
     'nothing feels real','going through it','dark place right now','can’t see a way out',
@@ -278,7 +389,8 @@ export const EMOTION_LEXICON = {
     'a fading polaroid','ghost of a memory','the weight of yesterday','a room that used to be','echoes of a life before','a static memory','the shape of what was',
     'a voice i used to know','the room still smells like before','a signal from somewhere i used to be',
   ]},
-  vice: { weight: -0.3, tense: 0.2, arousal: 0.3, words: [
+  // default LOW: habit and neglect, not agitation.
+  vice: { weight: -0.3, tense: 0.2, arousal: -0.15, words: [
 
     'one more round','just one more drink','skip the gym again','bad habit again',
     'cheat day energy','no self control today','indulging a bit too much','impulse buy again',
@@ -331,7 +443,8 @@ export const EMOTION_LEXICON = {
     'lowkey','highkey','fr fr','say less','it\'s giving','slay','periodt','tbh ngl','vibe check','same energy','big mood','felt that','literally me',
     'meh','whatever man','chill out','take it easy','moving along','same as always','nothing much','just here',
   ]},
-  confusion: { weight: 0, tense: 0.3, arousal: 0.2, words: [
+  // default LOW: disorientation and fog, which is passive.
+  confusion: { weight: 0, tense: 0.3, arousal: -0.1, words: [
 
     'not following','lost the thread','what’s happening here','totally lost rn',
     'brain fog today','can’t wrap my head around this','doesn’t add up','still processing this',

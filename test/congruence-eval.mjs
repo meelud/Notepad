@@ -168,7 +168,10 @@ for (const row of tempoRows) {
 {
   const exc = all.filter(r => r.a > 0), cal = all.filter(r => r.a < 0);
   const meanF = rs => rs.length ? rs.reduce((s, r) => s + pacingFactorFor(r.arousalScore), 0) / rs.length : NaN;
-  console.log(`  mean pacing factor: excited ${meanF(exc).toFixed(3)}  calm ${meanF(cal).toFixed(3)}  ratio ${(meanF(cal) / meanF(exc)).toFixed(3)}x (${dB(meanF(cal) / meanF(exc))})`);
+  // Tempo is a ratio, not a decibel figure: dB measures loudness. A
+  // speed ratio of 1.31x is reported as 1.31x and nothing else.
+  console.log(`  mean pacing factor: excited ${meanF(exc).toFixed(3)}  calm ${meanF(cal).toFixed(3)}`);
+  console.log(`  calm/excited tempo ratio: ${(meanF(cal) / meanF(exc)).toFixed(3)}x`);
 }
 
 // ── 2. LOUDNESS ───────────────────────────────────────────────────
@@ -227,6 +230,11 @@ show('sad, engine scored A-', sadLowA);
 
 // ── 3. VALENCE ────────────────────────────────────────────────────
 console.log(`\n─── 3. Valence (mode colour) ───`);
+console.log(`  METRIC: third/fifth only, read off the mode's own interval set — NOT an`);
+console.log(`  expert-coded label. "happy" = major third + perfect fifth + no flat second;`);
+console.log(`  "sad" = minor third. Sources: Hevner 1936; Gagnon & Peretz 2003.`);
+console.log(`  The audit's earlier 76.8% used expert coding and is a DIFFERENT measure.`);
+console.log(`  Do not compare the two; quote only this one and name the metric.`);
 {
   const directed = all.filter(r => r.v !== 0);
   const right = directed.filter(r => (r.v > 0 ? readsHappy(r.mode) : readsSad(r.mode)));

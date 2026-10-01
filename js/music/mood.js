@@ -1,4 +1,4 @@
-import { EMOTION_LEXICON } from './lexicon-en.js';
+import { EMOTION_LEXICON, AROUSAL_OVERRIDES } from './lexicon-en.js';
 import { foldPersian } from '../utils/text.js';
 import { FA_LEXICON_COLLOQUIAL } from './lexicon-fa-colloquial.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
@@ -38,29 +38,61 @@ export { CONTRAST_WORDS };
  * Lower-case a lexicon entry and collapse it to space-separated word tokens, so
  * lookup is insensitive to case and punctuation.
  *
+ * The zero-width characters are dropped here so a ZWNJ-joined word matches its
+ * unjoined spelling. They are NOT dropped in tokenize(), whose offsets index
+ * the string buildRender() is handed — see foldPersian() in utils/text.js.
+ *
  * Arabic yeh/kaf are folded by foldPersian() on the TEXT side instead, at the
- * top of tokenize() and detectMood(): normalizePhrase only ever sees lexicon
- * entries, which are all written in Persian codepoints, so folding them here
- * alone would fix the lookup while leaving the typed text, the RNG seed and
- * the token offsets on a different spelling. Doing both sides together is what
- * makes the two spellings produce the same piece of music.
+ * top of tokenize(), detectMood(), hashText() and scanPhraseMatches():
+ * normalizePhrase only ever sees lexicon entries, which are all written in
+ * Persian codepoints, so folding them here alone would fix the lookup while
+ * leaving the typed text, the RNG seed and the token offsets on a different
+ * spelling.
  */
 function normalizePhrase(str) {
-  return (str.toLowerCase().match(/[a-zA-Zا-ی]+/g) || []).join(' ');
+  return (str.toLowerCase()
+    .replace(/[‌‏‎]/g, '')
+    .match(/[a-zA-Zء-ی]+/g) || []).join(' ');
 }
 
 let MAX_PHRASE_LEN = 1;
 const PHRASE_LOOKUP = (() => {
   const map = {};
-  Object.values(EMOTION_LEXICON).forEach(({ weight, tense, arousal = 0, words }) => {
+  // Overrides are keyed by the lexicon entry, but lookups go through
+  // normalizePhrase, which can alter a string (ZWNJ, punctuation), so the
+  // override tables are normalized once here too. An override that matches
+  // nothing is reported rather than silently ignored.
+  const normTable = table => {
+    const out = {};
+    for (const [w, v] of Object.entries(table || {})) out[normalizePhrase(w)] = v;
+    return out;
+  };
+  const normOverrides = {};
+  for (const [k, v] of Object.entries(AROUSAL_OVERRIDES)) normOverrides[k] = normTable(v);
+  const unmatched = [];
+
+  Object.entries(EMOTION_LEXICON).forEach(([cat, { weight, tense, arousal = 0, words }]) => {
+    // mergeColloquialLexicon() above has already folded the Persian word lists
+    // into these same categories, so one pass covers both languages. A
+    // 'fa:<cat>' override is the specific one and wins for a Persian entry; the
+    // plain '<cat>' table is the English/unspecified fallback.
+    const overrides = { ...(normOverrides[cat] || {}), ...(normOverrides['fa:' + cat] || {}) };
     words.forEach(w => {
       const key = normalizePhrase(w);
       if (!key) return;
-      map[key] = { weight, tense, arousal };
+      map[key] = { weight, tense, arousal: overrides[key] ?? arousal };
+      // only count as used once the entry has actually been seen, so a typo in
+      // an override key is reported rather than ignored
+      if (key in overrides) delete overrides[key];
       const len = key.split(' ').length;
       if (len > MAX_PHRASE_LEN) MAX_PHRASE_LEN = len;
     });
+    for (const left of Object.keys(overrides)) unmatched.push(`${cat}/${left}`);
   });
+
+  if (unmatched.length) {
+    console.warn(`arousal: ${unmatched.length} override(s) matched no lexicon entry: ${unmatched.join(', ')}`);
+  }
   return map;
 })();
 
