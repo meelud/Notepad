@@ -327,7 +327,31 @@ if (!hit && len >= 3 && i + len < words.length) {
 // Band edges are the SAME five sentiment buckets test/evaluate-mood.mjs
 // uses to score detectMood(), so "what counts as very positive" means
 // one thing across the project.
-export const VALENCE_EDGES = { veryNeg: -0.9, neg: -0.25, pos: 0.25, veryPos: 0.9 };
+//
+// DERIVATION of the outer edges, from the lexicon's own numbers rather than
+// from the gold set:
+//
+//   detectMood divides the summed lexicon weights by
+//       divisor = max(1.6, sqrt(wordCount) * 0.7)
+//   which is 1.6 for any text of five words or fewer. The strongest single
+//   entry the lexicon holds at |weight| = 1 therefore lands at
+//       1.0 / 1.6 = 0.625
+//   in a short sentence, however emphatic that sentence is.
+//
+// veryPos was 0.9, so a single maximally strong term could not reach the top
+// tier at all — "I am happy." measured 0.632 and stayed pentMajor. The top
+// tier was reachable only by stacking several terms, which made it a measure of
+// verbosity as much as of feeling. 0.625 is that same number: the top tier now
+// begins exactly where one unambiguous strong term puts it, so a reader who
+// says one strong thing is heard as fully as a reader who says several weak
+// ones.
+//
+// veryNeg is derived the same way and for the same reason. The asymmetry is
+// real and comes from the lexicon rather than from these constants: its
+// strongest positive entry is joy at 1.1 and its strongest negative is sadness
+// at 1.0, so a single joy word overshoots the positive edge by 0.06 and a
+// single sad word lands exactly on the negative one.
+export const VALENCE_EDGES = { veryNeg: -0.625, neg: -0.25, pos: 0.25, veryPos: 0.625 };
 // Inside the 'neg' bucket, above this only faint negativity remains.
 const MILD_NEG = -0.4;
 

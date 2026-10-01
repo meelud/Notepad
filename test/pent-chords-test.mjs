@@ -131,14 +131,20 @@ console.log('\npentatonic chords from the parent scale\n');
 // 5. and the structural reason it cannot, stated as an invariant: the snap
 //    works in scale-degree indices into currentScale
 {
-  const h = deriveTextHarmony('hey baby i love you');
-  check('the pentatonic mode is reachable, so the hazard was real',
-    PENTS.includes(h.mood) || h.mood === 'pentMajor', h.mood);
+  // Not this specific text: the top-tier edge is derived now, and "hey baby i
+  // love you" is soft enough to land in major. Probe for a pentatonic mode.
+  let probe = null;
+  for (const t of ['hey baby i love you', 'I love you', 'she said yes', 'I adore you', 'my heart is full']) {
+    const h = deriveTextHarmony(t);
+    if (PENTS.includes(h.mood)) { probe = h.mood; break; }
+  }
+  check('a pentatonic mode is reachable, so the hazard was real',
+    probe !== null, probe || 'none of the probes reached a pentatonic mode');
   // the pad and the melody ARE on different scales by design — that is the
   // point of using the parent — so assert it rather than hoping it is false
   // degree 0 happens to land fully inside pentMajor, so the hazard shows at
   // other degrees — checked across all of them rather than assumed
-  let escapes = [];
+  const escapes = [];
   for (const pent of PENTS) {
     for (let d = 0; d < MODE_OFFSETS[pent].length; d++) {
       const semis = pentChordPitches(pent, d);

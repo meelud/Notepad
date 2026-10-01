@@ -70,6 +70,28 @@ check('neutral calm text → mixolydian', modeFor(0, 0) === 'mixolydian' && mode
 check('calm + clearly negative → minor, not dorian', modeFor(-0.6, 0) === 'minor' && modeFor(-1.2, 0.1) === 'minor');
 check('calm + faintly negative → dorian', modeFor(-0.3, 0) === 'dorian');
 // 6. end to end on real sentences
+// ── outer band edges are derived, not fitted ───────────────────
+// veryPos/veryNeg used to be 0.9/-0.9, which no single strong term could
+// reach: detectMood divides by max(1.6, sqrt(n)*0.7), so a |weight|=1 entry
+// in a short sentence lands at 0.625 and "I am happy." measured 0.632. The top
+// tier was reachable only by stacking terms, making it a measure of verbosity.
+// These assert the derivation itself rather than a gold-set number.
+{
+  const DIVISOR_FLOOR = 1.6;      // max(1.6, ...) for <= 5 words
+  const STRONGEST_SINGLE = 1.0;    // a |weight|=1 lexicon entry
+  const derived = STRONGEST_SINGLE / DIVISOR_FLOOR;
+  check(`the top tier begins at the derived edge (${derived.toFixed(3)})`,
+    Math.abs(VALENCE_EDGES.veryPos - derived) < 1e-9, `${VALENCE_EDGES.veryPos}`);
+  check('and the negative edge is derived the same way',
+    Math.abs(Math.abs(VALENCE_EDGES.veryNeg) - derived) < 1e-9, `${VALENCE_EDGES.veryNeg}`);
+  check('one strong term in a short sentence now reaches the top tier',
+    detectMood('I am happy.').normScore >= VALENCE_EDGES.veryPos,
+    `${detectMood('I am happy.').normScore}`);
+  check('and it gets a top-tier mode, not the middle one',
+    ['major', 'lydian'].includes(detectMood('I am happy.').mode),
+    detectMood('I am happy.').mode);
+}
+
 const E2E = [
   // No lexicon entry: the calm-neutral prior takes over and plays dorian, even
   // though the "!!" is enthusiastic. That is the specified rule — punctuation
