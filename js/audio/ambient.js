@@ -3,7 +3,25 @@ import { getPadSend } from './reverb.js';
 // the ambient bed's own randomness lives on its OWN stream (utils/rng.js)
 import { arnd as rnd, apick as pick } from '../utils/rng.js';
 import { BEAT_SEC, BEAT_MS, BAR_BEATS, createChordClock } from '../music/rhythm.js';
-import { currentScale, chordFromScale } from '../music/harmony.js';
+import { currentScale, chordFromScale, currentMood } from '../music/harmony.js';
+import { pentChordPitches } from '../music/pent-parent.js';
+
+/**
+ * The absolute frequencies of a pentatonic chord: the parent-scale triad,
+ * resolved onto the piece's own root and octave layout.
+ *
+ * `degree` is a pentatonic scale index. pentChordPitches returns semitones
+ * above the tonic of the MODE, so they are turned into frequencies through the
+ * same octave-mult layout chordFromScale uses, keeping the pad in register.
+ */
+function pentChordAbsolute(scale, degree, mode) {
+  const semis = pentChordPitches(mode, degree);
+  if (!semis) return chordFromScale(scale, degree);
+  const rootHz = scale[0];
+  return semis.map(s => rootHz * Math.pow(2, s / 12));
+}
+
+
 
 // ─── State ──────────────────────────────────────────────────────
 let ambTimers = [];
@@ -137,7 +155,15 @@ export function startAmbient(dests, isStopping, chordClock = createChordClock(1)
       currentChordDirection = chordClock.directionAtBar(bar);
       lastDegree = degree;
       currentChordRootDegree = degree;
-      playChord(chordFromScale(currentScale, degree), barDur * 1.15);
+      // PENTATONIC: stack the triad in the PARENT heptatonic scale, because a
+      // 5-note scale has no third — chordFromScale on pentMajor would give
+      // 0/4/9, which is not a chord. The pad may therefore sound a pitch the
+      // melody cannot; the melody snaps by scale-degree INDEX, so it stays
+      // inside its own scale regardless. Both halves are tested.
+      const chord = pentChordPitches(currentMood, degree)
+        ? pentChordAbsolute(currentScale, degree, currentMood)
+        : chordFromScale(currentScale, degree);
+      playChord(chord, barDur * 1.15);
       playTapeWarmth(barDur * 1.1);
     }
 

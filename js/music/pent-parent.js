@@ -100,3 +100,24 @@ for (const [pentMode, parentMode] of Object.entries(PENT_PARENT)) {
   PENT_PARENT_TRIADS[pentMode] = map.map(pi =>
     quality(degreeAt(parentOffsets, pi), degreeAt(parentOffsets, pi + 2), degreeAt(parentOffsets, pi + 4)));
 }
+
+/**
+ * The triad pitches for a pentatonic chord root, stacked in the PARENT and
+ * returned as SEMITONES. These can include pitches outside the pentatonic
+ * scale — that is unavoidable and intended: a 5-note scale cannot contain a
+ * major triad, so the pad plays the real triad while the melody stays inside
+ * its own scale. See test/pent-chords-test.mjs, which pins both halves.
+ *
+ * @param {string} pentMode
+ * @param {number} pentDegree
+ * @returns {number[]|null} three semitone offsets, or null if the mode has no parent
+ */
+export function pentChordPitches(pentMode, pentDegree) {
+  const parentMode = PENT_PARENT[pentMode];
+  if (!parentMode) return null;
+  const pentOffsets = MODE_OFFSETS[pentMode];
+  const parentOffsets = MODE_OFFSETS[parentMode];
+  const pi = pentOffsets[pentDegree % pentOffsets.length];
+  const parentIndex = parentOffsets.indexOf(pi);
+  return [0, 2, 4].map(k => degreeAt(parentOffsets, parentIndex + k));
+}

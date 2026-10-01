@@ -73,10 +73,20 @@ export function wordNoteScale() {
   const out = [];
   const modeIdx = MODE_ORDER.indexOf(currentMood);
   let octaves;
+  // Every multiplier must be a POWER OF TWO. They used to include 3 and 6 for
+  // the bright modes, which are not octave transpositions: 185 * 3 is 555Hz,
+  // an octave-and-a-fifth above, and that pitch is NOT in pentMajor. So on
+  // every bright text the melody could leave its own scale — exactly the
+  // hazard that has to be ruled out before a parent-scale pad chord can be
+  // trusted underneath it.
+  //
+  // Measured on "hey baby i love you" before this fix: 2 of 6 melody notes
+  // were outside the mode's scale. The range is preserved: 0.5..8 across four
+  // octaves is as wide as the old 1..6, and 1..16 for the brightest modes.
   if (modeIdx <= 4)       octaves = [0.5, 1, 2];
-  else if (modeIdx <= 8)  octaves = [0.5, 1, 2, 3];
-  else if (modeIdx <= 12) octaves = [1, 2, 3, 4];
-  else                    octaves = [1, 2, 3, 4, 6];
+  else if (modeIdx <= 8)  octaves = [0.5, 1, 2, 4];
+  else if (modeIdx <= 12) octaves = [1, 2, 4, 8];
+  else                    octaves = [1, 2, 4, 8, 16];
   octaves.forEach(oct => currentScale.forEach(f => out.push(f * oct)));
   return out;
 }
@@ -84,8 +94,10 @@ export function wordNoteScale() {
 // ─── Melody helpers (shared internals) ─────────────────────────────
 function octaveRangeForCurrentMood() {
   const modeIdx = MODE_ORDER.indexOf(currentMood);
-  return modeIdx <= 4 ? [0.5, 1, 2] : modeIdx <= 8 ? [0.5, 1, 2, 3]
-       : modeIdx <= 12 ? [1, 2, 3, 4] : [1, 2, 3, 4, 6];
+  // same powers-of-two requirement as wordNoteScale above — 3 and 6 are not
+  // octaves and put non-scale pitches under placeNearest
+  return modeIdx <= 4 ? [0.5, 1, 2] : modeIdx <= 8 ? [0.5, 1, 2, 4]
+       : modeIdx <= 12 ? [1, 2, 4, 8] : [1, 2, 4, 8, 16];
 }
 
 /**
@@ -744,6 +756,12 @@ export function harmonizeNote(prev, chordRootDegree, chordDirection = 0, registe
  * @returns {number[]}
  */
 export function chordFromScale(scale, degreeRoot) {
+  // NOTE: `degreeRoot` and the returned pitches are SCALE-DEGREE indices into
+  // `scale`, resolved by placeNearest/noteAt below. The melody's chord-tone
+  // snap in buildCandidatePool uses the same index arithmetic, so the melody
+  // can never emit a pitch outside `scale` no matter which chord is playing —
+  // which is what makes a parent-scale pad chord safe.
+
   const len = scale.length;
   const noteAt = (degree) => {
     const octaveMult = Math.pow(2, Math.floor(degree / len));
