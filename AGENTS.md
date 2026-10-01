@@ -49,38 +49,36 @@ node test/arousal-lexicon-test.mjs# per-category arousal rule
 node test/congruence-eval.mjs     # tuning-set report (in-sample, not a result)
 ```
 
-**Exactly two tests need the loader flag:**
+**Run the whole suite with one command:**
 
 ```bash
-node --import ./test/harness/register.mjs test/player-parity.mjs         # 106/106
-node --import ./test/harness/register.mjs test/timeline-formula-test.mjs
+node test/run-all.mjs             # one line per test, non-zero exit on any failure
+node test/run-all.mjs --verbose   # and the output of whatever failed
+node test/run-all.mjs zwnj        # only tests whose name matches
 ```
 
-Everything else in `test/*.mjs` runs as plain `node test/<name>.mjs`.
+`run-all.mjs` passes `--import ./test/harness/register.mjs` to EVERY test.
+That is deliberate and safe: verified across the whole suite, the assertion
+counts are identical whether or not a test that does not need the flag gets it
+(determinism, sync, dynamics and loudness-formula all match), and running one
+invocation instead of two removes the chance of running a test in the wrong
+mode.
+
+That last point is not hypothetical. `test/sync-test.mjs` was FAILING under the
+flag from c470ae5 until 8f1ac0f — 1/12, chordMismatch=13 of 14 bars — while
+PASSING 12/12 without it. The cause was in the test: it built its expected
+progression with `createChordClock(hashText(text))` and no mode, while
+`player.js` passes `pieceMood`, and since c470ae5 the chord-root set depends on
+the mode. A hand-written loop that only ran the plain invocation could not see
+a failure that only exists in the other one. Do not quote a suite total from
+memory or from a loop; quote what run-all.mjs printed.
 
 The `--import` hook registers `harness/trace-loader.mjs`, which wraps
-`harmony.js` to record melodic decisions without modifying production
-code. Only the two tests that read `globalThis.__TRACE__` need it.
+`harmony.js` to record melodic decisions without modifying production code.
 
-Verified by running the whole suite both ways: these two are the only
-tests whose result differs, and both FAIL without the flag rather than
-passing quietly. `determinism-test`, `sync-test`, `dynamics-test` and
-`loudness-formula-test` also run the real `play()`, but they install the
-harness themselves — `loudness-formula-test` calls `installFakeClock()` and
-`installStubs()` directly instead of going through `run-play.mjs`, and
-`determinism-test`/`sync-test`/`dynamics-test` do the same — so the flag is
-redundant for them, not required. Passing them the flag changes nothing
-(assertion counts identical both ways).
-
-The trap worth knowing: `loudness-formula-test` cannot pass vacuously. Its
-first assertion is `gains.length === toks.length`, so a `play()` that
-sounded nothing fails immediately rather than skipping the comparisons.
-The same is true of `timeline-formula-test` — but only with the flag,
-without it the trace is empty and the test reports `play=0 formula=12`.
-
-There is no aggregate runner because a `package.json` would violate the
-no-dependency rule; loop over `test/*.mjs` and pass `--import` for the two
-above.
+`run-all.mjs` exists despite the no-dependency rule because it uses only
+`node:child_process` and the standard library. It is not the reason
+`package.json` is still absent, and adding one is still not needed.
 
 **The test suite does not cover the browser entry point.** Nothing imports
 `main.js`, `ui.js`, `player.js`, `voices.js`, `ambient.js`, `reverb.js`,

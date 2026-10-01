@@ -16,6 +16,7 @@ import { runPlay } from './harness/run-play.mjs';
 import { simulateText } from './player-sim.mjs';
 import { LONG_TEXTS } from './eval-dataset-with-long-texts.mjs';
 import { createChordClock, BAR_MS } from '../js/music/rhythm.js';
+import { deriveTextHarmony } from '../js/music/harmony.js';
 import { hashText } from '../js/music/harmony.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +29,14 @@ let fail = 0;
 for (const text of LONG_TEXTS) {
   const { trace, chords, ambientStart } = await runPlay(root, text, { jitterSeed: 9, jitterMax: J, withTiming: true });
   const sim = simulateText(text).sequence;
-  const clock = createChordClock(hashText(text));
+  // The mode must be passed, or this builds a DIFFERENT progression from the
+  // one player.js plays: player.js passes pieceMood, and since c470ae5 the
+  // root set depends on it. Before that commit createChordClock(seed) was the
+  // whole story and this was correct by accident; afterwards it compared the
+  // audible chords against a clock that had no mode and reported
+  // chordMismatch=13 of 14 bars on texts that were actually in sync.
+  const mode = deriveTextHarmony(text).mood;
+  const clock = createChordClock(hashText(text), mode);
 
   // A) audible chord == assumed chord
   const wrong = chords.filter((c, k) => c.degree !== clock.degreeAtBar(k)).length;
