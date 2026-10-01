@@ -58,14 +58,6 @@ const NO_ZWNJ = [
   'The room without windows felt heavy',
 ];
 
-// آ (U+0622) is a KNOWN separate bug, not fixed here: it sits below the ا-ی
-// range, so "آرامش" splits into "رامش" and matches nothing even though the
-// lexicon entry is written "آرامش". Widening the range to cover it fixes three
-// gold texts, but it is not this commit, and it would break the promise below
-// that no-ZWNJ texts are untouched. These pin the CURRENT behaviour so the
-// day someone fixes آ, this test is what tells them the gold set moved.
-const ALEF_MADDA_KNOWN_BROKEN = ['صبح آرومیه و دلم پر از آرامشه'];
-
 console.log('\nZWNJ-aware word extraction\n');
 
 // ── 1. the extractor itself ────────────────────────────────────
@@ -222,35 +214,27 @@ console.log('\nZWNJ-aware word extraction\n');
   check('the no-ZWNJ control corpus really has no ZWNJ',
     NO_ZWNJ.every(t => !t.includes(ZWNJ)));
 
-  // آ still splits, and that is the documented state, not an accident
-  check('آ still splits (known bug, deliberately not fixed here)',
-    JSON.stringify(extractWords('آرامش')) === JSON.stringify(['رامش']),
-    JSON.stringify(extractWords('آرامش')));
+  // آ (U+0622) and the other hamza carriers below U+0627 are now inside
+  // words too. That was a separate bug, one character below this one, and
+  // fixing it is why this block no longer asserts the opposite. See
+  // test/lexicon-round-trip-test.mjs, which derives every such letter
+  // instead of listing them.
+  check('آ is part of a word (آرامش is no longer "رامش")',
+    JSON.stringify(extractWords('آرامش')) === JSON.stringify(['آرامش'])
+    && JSON.stringify(extractWords('صبح آرامشه')) === JSON.stringify(['صبح', 'آرامشه']),
+    JSON.stringify(extractWords('آرامشه')));
 
-  // the range was NOT widened: the Arabic hamza carriers must stay non-words
-  check('the Arabic hamza carriers are not words',
-    ['أ', 'إ', 'ؤ', 'ئ', 'ء'].every(c => extractWords(c).length === 0));
-
-  // and the gold text that contains آ must still score exactly as it did
-  // before this commit — 0.000. This is the check that would catch the layers
-  // disagreeing: the bug it exists for was scanPhraseMatches() re-extracting
-  // words with a different character range than detectMood(), which moved this
-  // text in the span layer while the mood layer still read it as neutral.
-  let aBad = [];
-  for (const t of ALEF_MADDA_KNOWN_BROKEN) {
+  // the gold text that carried آ now scores positive, and every layer agrees
+  {
+    const t = 'صبح آرومیه و دلم پر از آرامشه.';
     const m = detectMood(t);
-    if (m.normScore !== 0 || m.arousalScore !== 0) aBad.push(`${t}: ${m.normScore}/${m.arousalScore}`);
+    check('a ZWNJ-free text containing آ is positive now (was 0.000)',
+      Math.abs(m.normScore - 0.3212698020578431) < 1e-9, `norm=${m.normScore}`);
+    check('every layer agrees on the آ text',
+      scanPhraseMatches(extractWords(t)).length === 1
+      && deriveSemanticSpans(t).length === 1,
+      `scan=${scanPhraseMatches(extractWords(t)).length} spans=${deriveSemanticSpans(t).length}`);
   }
-  check('a ZWNJ-free text containing آ is untouched (still 0.000, as before)',
-    aBad.length === 0, aBad.join(' | '));
-
-  // every layer must agree on where the word boundaries are for that text
-  const t2 = ALEF_MADDA_KNOWN_BROKEN[0];
-  check('scanPhraseMatches agrees with detectMood on the آ text (no match)',
-    scanPhraseMatches(extractWords(t2)).length === 0,
-    JSON.stringify(scanPhraseMatches(extractWords(t2)).map(x => x.length)));
-  check('deriveSemanticSpans agrees too (no span)',
-    deriveSemanticSpans(t2).length === 0, JSON.stringify(deriveSemanticSpans(t2)));
 }
 
 // ── 6. offsets and the rendered text still line up ──────────────
