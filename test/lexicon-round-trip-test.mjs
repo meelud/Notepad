@@ -20,7 +20,7 @@
 // entry, with no prior knowledge of which letters are involved.
 
 import { EMOTION_LEXICON, wordEmotionWeight, detectMood } from '../js/music/mood.js';
-import { extractWords, WORD_RE } from '../js/utils/text.js';
+import { extractWords, WORD_RE, foldPersian } from '../js/utils/text.js';
 import { MODE_OFFSETS } from '../js/music/scales.js';
 
 /** Perceptual cues, as in mode-mapping-test.mjs (Gagnon & Peretz 2003; Hevner 1936). */
@@ -40,9 +40,14 @@ function check(name, ok, detail = '') {
  * imported: if this test called normalizePhrase() it would pass by construction
  * and prove nothing. Kept as a literal so a future change to the shared helper
  * has to be made here too, deliberately.
+ *
+ * Includes the madda-less fold, because that is part of the key: extractWords()
+ * folds آ onto ا for lookup, so "آرامش" is stored as "ارامش" and a text typed
+ * either way finds it.
  */
 function lexiconKeyTokens(entry) {
   return (entry.toLowerCase()
+    .replace(/\u0622/g, '\u0627')
     .replace(/[\u200C\u200F\u200E]/g, '')
     .match(/[a-zA-Z\u0621-\u06CC]+/g) || []);
 }
@@ -85,25 +90,42 @@ console.log('\nlexicon round trip\n');
   check('WORD_RE holds every letter in U+0621-U+06CC', missing.length === 0,
     missing.map(c => `U+${c.codePointAt(0).toString(16).toUpperCase()}`).join(' '));
 
-  // and the six below U+0627 specifically, each with a word that needs it
+  // The five below U+0627 other than آ, each with a word that needs it. آ is
+  // excluded from this check and covered right after: it stays inside the word,
+  // but extractWords then folds it onto ا for the lookup key.
   const PROBES = [
-    ['آ U+0622', 'آرامش', 'آرام'],
-    ['أ U+0623', 'مسأله', null],
-    ['إ U+0625', 'إیمان', null],
-    ['ؤ U+0624', 'مؤثر', null],
-    ['ئ U+0626', 'سؤال', null],
-    ['ء U+0621', 'مسئله', null],
+    ['أ U+0623', 'مسأله'],
+    ['إ U+0625', 'إیمان'],
+    ['ؤ U+0624', 'مؤثر'],
+    ['ئ U+0626', 'سؤال'],
+    ['ء U+0621', 'مسئله'],
   ];
   const bad = [];
   for (const [label, word] of PROBES) {
     const toks = extractWords(word);
     if (toks.length !== 1 || toks[0] !== word) bad.push(`${label} "${word}" → ${JSON.stringify(toks)}`);
   }
-  check('the six letters below U+0627 stay inside their words', bad.length === 0, bad.join('; '));
+  check('the five other letters below U+0627 stay inside their words', bad.length === 0, bad.join('; '));
+
+  // آ is inside its word but folded for the key, so the two contracts are
+  // asserted separately rather than the test stating one and meaning the other
+  // «رامش» is one word again too — that was the original آ bug, fixed in
+  // 12efe53. What distinguishes them now is that "آرامش" keeps its madda in the
+  // token and "رامش" never had one, so the two are different strings.
+  check('آ stays inside its word (WORD_RE keeps the character)',
+    'آرامش'.match(WORD_RE).length === 1
+    && 'آرامش'.match(WORD_RE)[0] === 'آرامش'
+    && 'رامش'.match(WORD_RE)[0] !== 'آرامش',
+    JSON.stringify('آرامش'.match(WORD_RE)) + ' vs ' + JSON.stringify('رامش'.match(WORD_RE)));
+  check('and extractWords folds it onto ا for the key',
+    JSON.stringify(extractWords('آرامش')) === JSON.stringify(['ارامش']));
+  check('while foldPersian leaves it for the display',
+    foldPersian('آرامش') === 'آرامش');
 
   // ZWNJ must also be inside its word — the other half of the same class
   const zwnj = extractWords('بی‌حس');
-  check('U+200C stays inside its word', zwnj.length === 1, JSON.stringify(zwnj));
+  check('U+200C stays inside its word (WORD_RE) and is stripped for lookup',
+    'بی‌حس'.match(WORD_RE).length === 1 && zwnj.length === 1, JSON.stringify(zwnj));
 }
 
 // 3. the calm vocabulary end to end, because that is what was lost.

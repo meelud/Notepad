@@ -117,7 +117,40 @@ export function stripZeroWidth(s) {
  * @returns {string[]}
  */
 export function extractWords(text) {
-  return extractWordsKeepZwnj(text).map(stripZeroWidth);
+  return extractWordsKeepZwnj(text).map(stripZeroWidth).map(stripMadda);
+}
+
+/**
+ * Folds آ (U+0622) onto ا (U+0627) — LOOKUP ONLY.
+ *
+ * Persian speakers routinely write آ as ا because they type faster than they
+ * hold the modifier key, and older Iranian keyboards and phone IMEs did not
+ * have it at all. So "ارامش" and "آرامش" are the same word to a reader, and the
+ * lexicon only knows the spelled-with-madda one. Before this fold:
+ *
+ *   wordEmotionWeight("آرامش") = 0.7      wordEmotionWeight("ارامش") = 0
+ *   detectMood("آرامش دارم")  = 0.4375    detectMood("ارامش دارم")  = 0
+ *
+ * Both are scored from the PHRASE_LOOKUP key, so the fold belongs on the key
+ * and nowhere else.
+ *
+ * It must NOT reach tokenize(), hashText() or any offset arithmetic. A madda
+ * is a real character in the displayed text, and folding it there would change
+ * the string length, break the offsets buildRender() is handed, and change the
+ * RNG seed — so the same sentence would both render differently and play a
+ * different piece depending on which path looked at it. foldPersian() is
+ * 1:1 and leaves آ alone for exactly that reason; this one is not, and is
+ * deliberately confined to extractWords().
+ *
+ * Collisions are reported at load time rather than silently resolved: see
+ * reportMaddaCollisions() in mood.js, which prints any two entries that differ
+ * only by آ-vs-ا.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+export function stripMadda(s) {
+  return s.replace(/\u0622/g, '\u0627');
 }
 
 /**

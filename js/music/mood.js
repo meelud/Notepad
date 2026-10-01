@@ -1,5 +1,5 @@
 import { EMOTION_LEXICON, AROUSAL_OVERRIDES } from './lexicon-en.js';
-import { foldPersian, extractWords, stripZeroWidth } from '../utils/text.js';
+import { foldPersian, extractWords, stripZeroWidth, stripMadda } from '../utils/text.js';
 import { FA_LEXICON_COLLOQUIAL } from './lexicon-fa-colloquial.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
 
@@ -65,6 +65,14 @@ function normalizePhrase(str) {
 }
 
 let MAX_PHRASE_LEN = 1;
+/**
+ * Lexicon entries that the madda-less lookup fold merged, as { key, kept,
+ * dropped }. Populated once during the PHRASE_LOOKUP build below. Exported so
+ * the collision count can be asserted in a test rather than read off a console
+ * warning nobody sees.
+ */
+export let MADDA_COLLISIONS = [];
+
 const PHRASE_LOOKUP = (() => {
   const map = {};
   // Overrides are keyed by the lexicon entry, but lookups go through
@@ -79,6 +87,10 @@ const PHRASE_LOOKUP = (() => {
   const normOverrides = {};
   for (const [k, v] of Object.entries(AROUSAL_OVERRIDES)) normOverrides[k] = normTable(v);
   const unmatched = [];
+  // entries whose spelling differs from an earlier one only by آ-vs-ا, which
+  // the lookup fold now makes the same key. Recorded rather than resolved: the
+  // later entry wins in `map`, and whoever writes the lexicon should know.
+  const maddaCollisions = [];
 
   Object.entries(EMOTION_LEXICON).forEach(([cat, { weight, tense, arousal = 0, words }]) => {
     // mergeColloquialLexicon() above has already folded the Persian word lists
@@ -89,7 +101,12 @@ const PHRASE_LOOKUP = (() => {
     words.forEach(w => {
       const key = normalizePhrase(w);
       if (!key) return;
-      map[key] = { weight, tense, arousal: overrides[key] ?? arousal };
+      // a collision needs both entries to spell the same key AND to be written
+      // differently — if they are the same string there is nothing to report
+      if (key in map && map[key].spelling !== w) {
+        maddaCollisions.push({ key, kept: map[key], dropped: { cat, w, weight } });
+      }
+      map[key] = { weight, tense, arousal: overrides[key] ?? arousal, spelling: w, cat };
       // only count as used once the entry has actually been seen, so a typo in
       // an override key is reported rather than ignored
       if (key in overrides) delete overrides[key];
@@ -101,6 +118,12 @@ const PHRASE_LOOKUP = (() => {
 
   if (unmatched.length) {
     console.warn(`arousal: ${unmatched.length} override(s) matched no lexicon entry: ${unmatched.join(', ')}`);
+  }
+  MADDA_COLLISIONS = maddaCollisions;
+  if (maddaCollisions.length) {
+    console.warn(`mood: ${maddaCollisions.length} lexicon entr(ies) merged by the madda-less fold ` +
+      `(آ/ا); the later spelling wins: ` +
+      maddaCollisions.map(c => `"${c.key}" kept "${c.kept.spelling}" over "${c.dropped.w}"`).join(', '));
   }
   return map;
 })();
@@ -252,7 +275,13 @@ export function scanPhraseMatches(words) {
   // and foldPersian() is 1:1 in length. Stripping the ZWNJ does shorten the
   // copy's strings, but they are only ever used as lookup keys, and the
   // lexicon keys were stripped the same way in normalizePhrase().
-  words = words.map(w => stripZeroWidth(foldPersian(w)));
+  // stripMadda() is here as well as in extractWords(): this function is called
+  // with words from WORD_RE as well as from extractWords(), and deriveSemanticSpans
+  // uses the former so it can keep character offsets. Those words still carry
+  // their madda, so without this the span layer built keys with آ while the mood
+  // layer built them with ا, and "صبح آرومیه و دلم پر از آرامشه." matched in one
+  // layer and not the other.
+  words = words.map(w => stripMadda(stripZeroWidth(foldPersian(w))));
   const matches = [];
   let i = 0;
   while (i < words.length) {

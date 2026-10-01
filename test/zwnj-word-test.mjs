@@ -219,10 +219,16 @@ console.log('\nZWNJ-aware word extraction\n');
   // fixing it is why this block no longer asserts the opposite. See
   // test/lexicon-round-trip-test.mjs, which derives every such letter
   // instead of listing them.
-  check('آ is part of a word (آرامش is no longer "رامش")',
-    JSON.stringify(extractWords('آرامش')) === JSON.stringify(['آرامش'])
-    && JSON.stringify(extractWords('صبح آرامشه')) === JSON.stringify(['صبح', 'آرامشه']),
-    JSON.stringify(extractWords('آرامشه')));
+  // extractWords folds آ onto ا for the lookup key (see stripMadda and
+  // test/madda-fold-test.mjs), so the key is "ارامش" here. What matters for
+  // this file is that it is ONE word and that it is not "رامش" — the madda bug
+  // — and that tokenize() still shows the character the user typed.
+  check('آ is part of a word (one token, and not "رامش")',
+    JSON.stringify(extractWords('آرامش')) === JSON.stringify(['ارامش'])
+    && extractWords('آرامش').length === 1,
+    JSON.stringify(extractWords('آرامش')));
+  check('and tokenize() keeps the madda the user typed',
+    tokenize('صبح آرامشه').filter(t => t.type === 'word').map(t => t.text).join(' ') === 'صبح آرامشه');
 
   // the gold text that carried آ now scores positive, and every layer agrees
   {
