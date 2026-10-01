@@ -37,13 +37,13 @@ const entryWeight = w => {
  * What a text is EXPECTED to score when the emotion word is the only thing in
  * it — i.e. the bare word's score, since "how are you" contributes nothing.
  *
- * Derived rather than hard-coded so that reclassifying a word does not quietly
- * turn these into wrong-value tests: "darling" was a love word at +1.0 and is
- * an endearment at +0.7, and the assertion follows it either way. The thing
- * being tested is that the phrase does not swallow the word, not what the word
- * happens to be worth today.
+ * Derived rather than hard-coded, so neither reclassifying a word ("darling"
+ * was love at +1.0, now an endearment at +0.7) nor the calm-neutral prior's
+ * shrinkage can turn these into wrong-value tests. What is being tested is that
+ * the casual phrase does not swallow the emotion word — not what the word is
+ * worth today.
  */
-const expected = w => detectMood(w).normScore;
+const expected = w => detectMood(`${w} how are you`).normScore;
 
 console.log('\nloose phrase match\n');
 

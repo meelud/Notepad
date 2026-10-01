@@ -335,6 +335,44 @@ const MILD_NEG = -0.4;
 const HIGH_AROUSAL = 0.5;
 const INTENSE_AROUSAL = 1.0;
 
+// ── The calm-neutral prior ──────────────────────────────────────────
+// What to play when a text says nothing we can read. See the long comment at
+// the end of detectMood(); these are the numbers it uses.
+//
+// PRIOR_MODE is dorian: a minor third with a raised sixth. Neither a major
+// third (which asserts happiness) nor a flat seventh (mixolydian, which asserts
+// unresolved brightness) nor a plain minor (which asserts sadness). Dorian is
+// the mode that asserts nothing about the writer's feelings.
+//
+// PRIOR_VALENCE and PRIOR_AROUSAL are both -0.15: faintly wistful, and calm
+// enough to play slower and softer than exactly neutral.
+//
+// PRIOR_STRENGTH is the evidence count at which the text's own reading is worth
+// half as much as the prior. conf = hits/(hits+STRENGTH), so 1 hit gives 0.333
+// and 2 hits gives 0.5.
+//
+// The prior's influence is additionally capped at PRIOR_MAX_PULL, because
+// conf alone pulls far too hard. A single joy hit over six words has a raw
+// normScore of 0.64; blending that with -0.15 at conf 1/3 gives 0.11, which is
+// not a slight nudge — it is a 82% loss of the sentiment from one real word.
+// Blending a score that has ALREADY been divided by sqrt(words) compounds two
+// dilutions.
+//
+// So the blend is:
+//
+//     pull     = min(1, conf) * PRIOR_MAX_PULL
+//     valence' = valence * (1 - pull) + PRIOR_VALENCE * pull
+//
+// which is the specified shrinkage with the strength bounded. At one hit the
+// pull is 0.2, so 0.64 becomes 0.53 — a nudge, not a reversal — and a text with
+// no hits gets the full pull and lands exactly on the prior. What the cap buys
+// is that the prior can never be the reason a readable text is misread.
+export const PRIOR_MODE = 'dorian';
+export const PRIOR_VALENCE = -0.15;
+export const PRIOR_AROUSAL = -0.15;
+export const PRIOR_STRENGTH = 2;
+export const PRIOR_MAX_PULL = 0.2;
+
 /**
  * Chooses the mode from the two numbers detectMood() measures, following
  * Russell's (1980) circumplex model of affect: VALENCE (normScore) picks
@@ -367,11 +405,16 @@ const INTENSE_AROUSAL = 1.0;
  * @param {number} tense  ACTIVATION (detectMood's arousalScore, not its tenseScore); the parameter keeps its old name so callers/tests stay valid
  * @returns {string} a key of MODE_OFFSETS
  */
-export function modeFor(norm, tense) {
+export function modeFor(norm, tense, priorMode) {
   const e = VALENCE_EDGES;
   const aroused = tense >= HIGH_AROUSAL;
   const intense = tense >= INTENSE_AROUSAL;
   const moderate = tense >= 0.25;
+
+  // No lexicon evidence at all: the caller's calm-neutral prior, which is
+  // dorian. Reached by passing priorMode, so the decision is visible here
+  // rather than hidden in detectMood's arithmetic.
+  if (priorMode) return priorMode;
 
   if (norm <= e.veryNeg) {
     return intense ? 'locrian' : aroused ? 'phrygian' : moderate ? 'harmonicMinor' : 'minor';
@@ -401,6 +444,12 @@ export function detectMood(text) {
   const lower = foldPersian(text).toLowerCase().replace(/n['’]t\b/g, ' not');
   const totalWords = extractWords(lower).length;
   let score = 0, tense = 0, arousal = 0;
+  // how many lexicon entries the text actually hit. This is the evidence the
+  // calm-neutral prior is weighed against, so it counts HITS and not words:
+  // one long entry like "دلم برات تمومی نداره" is as much evidence as three
+  // short ones, and a 40-word text with one adjective in it is not better read
+  // than a 3-word text with one.
+  let hits = 0;
 
   const sentences = lower.split(/[.!?؟]+/);
 
@@ -450,6 +499,7 @@ export function detectMood(text) {
 
         if (hit) {
           const m = mult[i];
+          hits++;
           if (isNegated(i, consumedLen)) {
             score += -hit.weight * 0.85 * m;
             tense += (Math.abs(hit.tense) * 0.5 + 0.15) * m;
@@ -472,6 +522,7 @@ export function detectMood(text) {
             const hit = PHRASE_LOOKUP[stem];
             if (hit) {
               const m = mult[i];
+              hits++;
               if (isNegated(i)) {
                 score += -hit.weight * 0.85 * 0.85 * m;
                 tense += (Math.abs(hit.tense) * 0.5 + 0.15) * 0.85 * m;
@@ -509,9 +560,79 @@ export function detectMood(text) {
   // ellipsis deflates.
   arousal += exclaim * 0.5 - ellipsis * 0.3;
 
-  const norm = score / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
-  const tenseNorm = tense / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
-  const arousalNorm = arousal / Math.max(1.6, Math.sqrt(totalWords) * 0.7);
+  const divisor = Math.max(1.6, Math.sqrt(totalWords) * 0.7);
+  const norm = score / divisor;
+  const tenseNorm = tense / divisor;
+  let arousalNorm = arousal / divisor;
 
-  return { mode: modeFor(norm, arousalNorm), normScore: norm, tenseScore: tenseNorm, arousalScore: arousalNorm };
+  // ── Calm-neutral prior ────────────────────────────────────────────
+  // A text we cannot read should not be played as neither-happy-nor-sad. It
+  // should be played as slightly wistful and calm, because that is the choice
+  // that produces the FEWEST wrong feelings for text whose meaning is unknown.
+  // A bright unresolved mode asserts "fine"; a dark one asserts "sad". Dorian
+  // asserts neither: a minor third with a raised sixth, which is the sound of
+  // thinking rather than of feeling.
+  //
+  // Applied as soft shrinkage toward the prior rather than as an override,
+  // weighted by how much evidence there actually is:
+  //
+  //     conf     = hits / (hits + PRIOR_STRENGTH)
+  //     valence' = valence * conf + PRIOR_VALENCE * (1 - conf)
+  //
+  // With zero lexicon hits conf is 0 and the prior stands alone. With many,
+  // conf approaches 1 and the prior vanishes. So a clear sentence plays exactly
+  // as before, and an unreadable one is gently tinted rather than overridden —
+  // the distinction being that shrinkage cannot invert a strong reading, while
+  // an override would.
+  //
+  // The prior's valence is small and NEGATIVE (-0.15): unknown text leans very
+  // slightly wistful, which is the mode dorian already encodes. Its arousal is
+  // the same -0.15, so unreadable text also plays slower and softer than neutral
+  // rather than at exactly 1.0x.
+  //
+  // Punctuation is EXCLUDED from the evidence count, and deliberately. '!' and
+  // '...' are activation cues that arrive whether or not the words meant
+  // anything, so letting them shrink the prior would let "ok!" argue itself out
+  // of calm on punctuation alone. They still move arousal (below), which is the
+  // one thing they are good evidence for.
+  const conf = hits / (hits + PRIOR_STRENGTH);
+  // valence: shrunk toward the prior, with the pull bounded — see PRIOR_MAX_PULL.
+  // The prior is small (-0.15) and the pull is at most PRIOR_MAX_PULL, so this
+  // can never invert a reading: a confident -1.0 moves to at most -0.83. What it
+  // does is stop an unreadable text asserting no feeling at all.
+  // conf==0 means NO evidence at all, and there the prior must stand in full,
+  // not at 20%: an unreadable text should be exactly the prior. The blend is
+  // therefore scaled by conf and capped, so it is 0 when there is no evidence
+  // to soften and never more than PRIOR_MAX_PULL.
+  const pull = Math.min(1, conf) * PRIOR_MAX_PULL;
+  const shrunk = norm * (1 - pull) + PRIOR_VALENCE * pull;
+  // …but with zero hits the reading IS zero and no blend can move it, because
+  // 0 * (1-pull) + prior*pull is only -0.03. So the prior applies outright when
+  // there is nothing to shrink: this is the one place it overrides rather than
+  // softens, and it is safe precisely because nothing was being read.
+  const finalNorm = hits === 0 ? PRIOR_VALENCE : shrunk;
+
+  // arousal: '!' and '...' move it whether or not any word meant anything, so
+  // punctuation alone must not count as evidence about the FEELING. The prior's
+  // arousal is applied only when there are no lexicon hits at all; once a word
+  // has actually said something, its activation stands, with the punctuation
+  // cue already added to it. This is the one asymmetry, and it exists so that
+  // "ok!!!" plays livelier than "ok" rather than being argued back to calm by a
+  // prior that has no opinion about exclamation marks.
+  const usePriorArousal = hits === 0;
+  const finalArousal = usePriorArousal
+    ? PRIOR_AROUSAL + arousalNorm * 0.25
+    : arousalNorm;
+
+  return {
+    // with no lexicon hits the prior's mode stands outright; with hits, the
+    // shrunk valence and real arousal choose it as usual
+    mode: modeFor(finalNorm, finalArousal, hits === 0 ? PRIOR_MODE : null),
+    normScore: finalNorm,
+    tenseScore: tenseNorm,
+    arousalScore: finalArousal,
+    // exposed so tests can assert the shrinkage rather than infer it
+    lexiconHits: hits,
+    priorConfidence: conf,
+  };
 }

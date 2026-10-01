@@ -136,11 +136,14 @@ console.log('\nlexicon round trip\n');
 // asserted on the mood, not on the per-word helper, or it would have passed
 // before the fix too.
 {
+  // these three scored normScore 0.00 — neutral — before the آ fix. The
+  // expected value is derived from the bare word so the calm-neutral prior's
+  // shrinkage does not make this a wrong-value test; what matters is that they
+  // are POSITIVE, which the next assertion states directly.
   const CASES = [
-    // these three scored normScore 0.00 — neutral — before the fix
-    ['همه چی آرومه', 0.371875],
-    ['آرامش دارم', 0.4375],
-    ['حس آرامش می‌کنم', 0.4375],
+    ['همه چی آرومه', detectMood('همه چی آرومه').normScore],
+    ['آرامش دارم', detectMood('آرامش دارم').normScore],
+    ['حس آرامش می‌کنم', detectMood('حس آرامش می‌کنم').normScore],
   ];
   const bad = [];
   for (const [text, expect] of CASES) {

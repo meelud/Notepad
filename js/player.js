@@ -28,6 +28,10 @@ let lastHarmonyText = null; // the text harmonyLocked was derived from — auto-
 let sessionTenseScore = 0; // tenseScore of the current text (melodic tension)
 let sessionArousalScore = 0; // arousalScore of the current text, drives tempo (music/rhythm.js)
 let sessionNormScore = 0; // normScore of the current text, used to nudge reverb wetness
+// lexiconHits of the current text: 0 means the lexicon recognised nothing, and
+// the voice choice is then restricted to the warm subset rather than allowed to
+// draw from all 22. See WARM_VOICES.
+let sessionLexiconHits = 1;
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
 let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
 let pieceComposition = null; // whole-piece section timeline — see music/composition.js
@@ -94,6 +98,28 @@ const BRIGHT_VOICES = [1, 3, 5, 8, 9, 10, 11, 17, 18, 19]; // Pluck, Bell, Piano
 const PERCUSSIVE_VOICES = [1, 3, 5, 7, 8, 9, 10, 11, 14, 17, 19, 20];
 const RAMPED_VOICES = [0, 2, 4, 6, 12, 13, 15, 16, 18, 21];
 
+// ─── Warm voices for text we cannot read ──────────────────────────
+// When the text says nothing the lexicon recognises, the piece is not free to
+// pick anything: it must not assert a character the text never had. These are
+// the voices that assert least.
+//
+// Excluded, and why:
+//   14 Sub thump         — the attack is the whole point; a low thump on
+//                          "hello there" reads as a threat or a heartbeat
+//   21 Deep gong swell   — 8 seconds of decay on a two-word text is a joke
+//   20 Granular texture  — the least legible timbre in the set; it obscures
+//                          the pitch, which is the only thing a two-note piece
+//                          has to communicate
+//   18 Synth brass swell — brass is the loudest thing here and reads as
+//                          announcement; also 18 is in RAMPED_VOICES, so
+//                          leaving it out is what makes the family choice
+//                          below deterministic
+//
+// Included: 0 Soft pad, 2 Breath, 6 Warm synth pad, 12 Choir pad,
+// 13 Soft organ, 15 Reed/woodwind, 16 Bowed cello — all sustained, all
+// mid-range, none of them making a claim about mood on their own.
+const WARM_VOICES = [0, 2, 6, 12, 13, 15, 16];
+
 /**
  * Picks a voice from the sentenceType group, layering two signals:
  * mood (emotional color) and attack-family (structural/sequential
@@ -104,22 +130,50 @@ const RAMPED_VOICES = [0, 2, 4, 6, 12, 13, 15, 16, 18, 21];
  * @param {number[]} group — sentenceType-appropriate voice indices
  * @param {number} normScore — session mood score (-1.5 dark .. 1.5 bright)
  * @param {number[]} family — PERCUSSIVE_VOICES or RAMPED_VOICES
+ * @param {number} lexiconHits — 0 restricts the choice to WARM_VOICES
  */
-function pickOrchestVoice(group, normScore, family) {
-  const moodSet = normScore <= -0.15 ? DARK_VOICES
+function pickOrchestVoice(group, normScore, family, lexiconHits) {
+  // No lexicon evidence: the timbre subset is not a preference but a limit. The
+  // group is intersected with WARM_VOICES FIRST, so the fallback chain below
+  // can only ever widen the answer within the warm set — if the intersection
+  // is empty we must fall back to WARM_VOICES itself rather than to the full
+  // group, which is how a Sub thump or a Deep gong would get in.
+  const pool = lexiconHits === 0
+    ? group.filter(v => WARM_VOICES.includes(v))
+    : group;
+  const fallback = lexiconHits === 0 ? WARM_VOICES : group;
+
+  // moodSet is deliberately not applied to silent text: DARK_VOICES contains
+  // Sub thump, Granular and Deep gong, which are exactly the three this commit
+  // excludes, and the prior's -0.15 valence would otherwise drag the choice
+  // straight back out of the warm subset.
+  const moodSet = lexiconHits === 0 ? null
+                : normScore <= -0.15 ? DARK_VOICES
                 : normScore >= 0.15  ? BRIGHT_VOICES
                 : null;
-  let candidates = group.filter(v => family.includes(v) && (!moodSet || moodSet.includes(v)));
-  if (candidates.length === 0) candidates = group.filter(v => family.includes(v));
-  if (candidates.length === 0 && moodSet) candidates = group.filter(v => moodSet.includes(v));
-  if (candidates.length === 0) candidates = group;
+
+  let candidates = pool.filter(v => family.includes(v) && (!moodSet || moodSet.includes(v)));
+  if (candidates.length === 0) candidates = pool.filter(v => family.includes(v));
+  if (candidates.length === 0) candidates = pool.filter(v => !moodSet || moodSet.includes(v));
+  if (candidates.length === 0) candidates = pool.length ? pool : fallback;
   return pick(candidates);
 }
 
 /** Picks the attack-family a new sentence should "live in" — follows
  * the mood's natural correlation (dark→ramped, bright→percussive),
  * coin-flip for neutral text. */
-function familyForMood(normScore) {
+function familyForMood(normScore, lexiconHits) {
+  // No evidence at all: RAMPED, always. The old code COIN-FLIPPED between the
+  // two families here, which meant the same unreadable text could come out
+  // percussive on one run and swelling on the next — the piece contradicting
+  // itself for no reason. Every voice in WARM_VOICES is ramped, so this is
+  // both deterministic and consistent with the timbre subset below.
+  // Deliberately consumes NO RNG draw. The old coin flip consumed one, and the
+  // value it returned was arbitrary; removing the draw keeps the render stream
+  // the same length as before for text that is already known to be dark or
+  // bright, and shifts it only for text that is newly silent. player-parity
+  // pins the stream length, so this is checked rather than assumed.
+  if (lexiconHits === 0) return RAMPED_VOICES;
   if (normScore <= -0.15) return RAMPED_VOICES;
   if (normScore >= 0.15) return PERCUSSIVE_VOICES;
   return pick([PERCUSSIVE_VOICES, RAMPED_VOICES]);
@@ -159,6 +213,7 @@ export async function play() {
     sessionTenseScore = harmonyInfo.tenseScore;
     sessionArousalScore = harmonyInfo.arousalScore;
     sessionNormScore = harmonyInfo.normScore;
+    sessionLexiconHits = harmonyInfo.lexiconHits;
     pieceMotif = generateMotif(hashText(text), sessionTenseScore);
     pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
     pieceSemanticSpans = SEMANTIC_STABILITY_ENABLED ? deriveSemanticSpans(text) : [];
@@ -265,8 +320,8 @@ export async function play() {
     flushSentence(); // trailing sentence with no terminal punctuation, if any
   }
 
-  let currentFamily = familyForMood(sessionNormScore);
-  let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily);
+  let currentFamily = familyForMood(sessionNormScore, sessionLexiconHits);
+  let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily, sessionLexiconHits);
   let lastNote = null; // melodic contour state: {degree, octave, lastInterval} — persists across sentences for register continuity
   let sentenceCycle = 0;       // 1-based count of sentences seen so far
   let wordIdxInSentence = 0;   // 0-based position of the current word within its sentence
@@ -462,7 +517,7 @@ export async function play() {
     // refresh the sentence's timbral "family" at each new sentence —
     // keeps a stable percussive-vs-swelling identity across the whole
     // sentence instead of rerolling structure word to word
-    if (sp.pos === 1) currentFamily = familyForMood(sessionNormScore);
+    if (sp.pos === 1) currentFamily = familyForMood(sessionNormScore, sessionLexiconHits);
 
     if (rnd(0, 1) < 0.4) {
       // cadence words may deliberately cross into the opposite family
@@ -472,7 +527,7 @@ export async function play() {
       const pickFamily = isCadence
         ? (currentFamily === PERCUSSIVE_VOICES ? RAMPED_VOICES : PERCUSSIVE_VOICES)
         : currentFamily;
-      voiceIdx = pickOrchestVoice(group, sessionNormScore, pickFamily);
+      voiceIdx = pickOrchestVoice(group, sessionNormScore, pickFamily, sessionLexiconHits);
     }
     VOICES[voiceIdx](freq, vol, dur, [panner]);
 
@@ -539,6 +594,10 @@ export function resetHarmony() {
   sessionTenseScore = 0;
   sessionArousalScore = 0;
   sessionNormScore = 0;
+  // reset too: it is session state like the scores above, and leaving it
+  // stale would carry the previous text's evidence count into a new piece —
+  // deciding the timbre subset from the wrong text.
+  sessionLexiconHits = 1;
 }
 
 export function clearAudioState() {

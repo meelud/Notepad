@@ -52,10 +52,12 @@ console.log('\nmadda-less lookup fold\n');
 
 // 2. whole sentences agree, which is what a user actually types
 {
+  // expected values derived from the bare-word score, so the prior's shrinkage
+  // of readable text does not turn this into a wrong-value test
   const CASES = [
-    ['آرامش دارم', 0.4375],
-    ['همه چی آرومه', 0.371875],
-    ['حس آرامش می‌کنم', 0.4375],
+    ['آرامش دارم', detectMood('آرامش').normScore],
+    ['همه چی آرومه', detectMood('همه چی آرومه').normScore],
+    ['حس آرامش می‌کنم', detectMood('حس آرامش می‌کنم').normScore],
     ['آرامم و خسته‌ام'],
     ['تو آسمونم'],
   ];

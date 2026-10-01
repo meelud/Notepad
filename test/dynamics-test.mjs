@@ -125,7 +125,16 @@ check('the calm side saturates on a floor, like tempo does',
   // side of the floor.
   check('peaceful stays distinct from grief (both quiet, but not identical)', dynamicsFor(calm) > dynamicsFor(quiet),
     `calm ${dynamicsFor(calm).toFixed(3)} vs grief ${dynamicsFor(quiet).toFixed(3)}`);
-  check('neutral text is left exactly alone', dynamicsFor(neutral) === 1 && velocityRange(neutral, false).lo === 0.18);
+  // Unreadable text is no longer left exactly alone: the calm-neutral prior
+  // gives it arousal -0.15, so it plays gently rather than at 1.0. What still
+  // has to hold is that it is the QUIETEST thing here and that a readable
+  // neutral-ish text with real evidence stays distinguishable from silence.
+  check('silent text plays gently (the prior, not exactly 1.0)',
+    dynamicsFor(neutral) < 1 && dynamicsFor(neutral) > dynamicsFor(quiet),
+    `${dynamicsFor(neutral).toFixed(3)} vs grief ${dynamicsFor(quiet).toFixed(3)}`);
+  check('and the prior does not reach the grief floor',
+    dynamicsFor(neutral) > dynamicsFor(quiet) && neutral > quiet,
+    `a neutral=${neutral.toFixed(3)} grief=${quiet.toFixed(3)}`);
   console.log(`      grief a=${quiet.toFixed(2)} k=${dynamicsFor(quiet).toFixed(3)}   furious a=${loud.toFixed(2)} k=${dynamicsFor(loud).toFixed(3)}`);
 }
 

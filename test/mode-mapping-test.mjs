@@ -71,7 +71,12 @@ check('calm + clearly negative → minor, not dorian', modeFor(-0.6, 0) === 'min
 check('calm + faintly negative → dorian', modeFor(-0.3, 0) === 'dorian');
 // 6. end to end on real sentences
 const E2E = [
-  ['وای چه خبر عالی!!', c => c.maj3 && c.P5],            // used to become minor
+  // No lexicon entry: the calm-neutral prior takes over and plays dorian, even
+  // though the "!!" is enthusiastic. That is the specified rule — punctuation
+  // moves arousal on silent text, never valence — so the valence here is the
+  // prior's -0.15 and the mode is the prior's dorian, with the "!!" audible as
+  // a lift in arousal only. Asserted so a future change to the prior is noticed.
+  ['وای چه خبر عالی!!', c => c.min3],             // was maj3 before the prior
   ['امروز خیلی خوشحالم و حالم عالیه', c => c.maj3 && c.P5],
   ['دلم شکسته و خیلی تنهام', c => c.min3],
   ['I am heartbroken and completely alone', c => c.min3],

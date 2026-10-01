@@ -61,7 +61,12 @@ const anger = A('I am furious and enraged'), joy = A('I am so happy and excited'
       sad = A('I am sad and lonely'), calm = A('I feel calm and peaceful');
 check('anger > joy > neutral', anger > joy && joy > neutral, `${anger.toFixed(2)} ${joy.toFixed(2)} ${neutral.toFixed(2)}`);
 check('neutral > sadness and neutral > calm', neutral > sad && neutral > calm, `${neutral.toFixed(2)} ${sad.toFixed(2)} ${calm.toFixed(2)}`);
-check('neutral text has zero arousal', neutral === 0);
+// Unreadable text now carries the prior's -0.15 rather than exactly 0, so it
+// plays gently instead of at neutral tempo. The ORDERING above still has to
+// hold, and silence must stay between anger and sadness — quieter than joy,
+// louder than calm.
+check('silent text sits slightly below zero (the calm prior)', neutral < 0 && Math.abs(neutral) < 0.2,
+  `${neutral.toFixed(4)}`);
 
 // 3. punctuation cues and negation
 check('"!" raises arousal', A('I am so happy!!') > A('I am so happy'));
