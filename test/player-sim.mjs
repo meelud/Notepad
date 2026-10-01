@@ -75,7 +75,7 @@ export function simulateText(text) {
   let semanticSpanCursor = 0;
 
   // deterministic timeline shared with player.js (music/rhythm.js)
-  const chordClock = createChordClock(hashText(text));
+  const chordClock = createChordClock(hashText(text), harmonyInfo.mood);
   let virtualMs = 0;
 
   const sequence = [];

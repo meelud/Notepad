@@ -32,6 +32,8 @@ let sessionNormScore = 0; // normScore of the current text, used to nudge reverb
 // the voice choice is then restricted to the warm subset rather than allowed to
 // draw from all 22. See WARM_VOICES.
 let sessionLexiconHits = 1;
+// mode of the current text, for createChordClock's per-mode root set
+let pieceMood = null;
 let pieceMotif = null; // {intervals:number[]} — generated once per text, reused across sentences
 let pieceIntentions = []; // clause-level Musical Intention sequence — see music/intention.js
 let pieceComposition = null; // whole-piece section timeline — see music/composition.js
@@ -214,6 +216,10 @@ export async function play() {
     sessionArousalScore = harmonyInfo.arousalScore;
     sessionNormScore = harmonyInfo.normScore;
     sessionLexiconHits = harmonyInfo.lexiconHits;
+    // remembered for the chord clock below, which needs the mode name and
+    // cannot call deriveTextHarmony again (it is not idempotent-free: it
+    // mutates module state in harmony.js)
+    pieceMood = harmonyInfo.mood;
     pieceMotif = generateMotif(hashText(text), sessionTenseScore);
     pieceIntentions = MUSICAL_INTENTION_ENABLED ? deriveIntentions(text) : [];
     pieceSemanticSpans = SEMANTIC_STABILITY_ENABLED ? deriveSemanticSpans(text) : [];
@@ -283,7 +289,9 @@ export async function play() {
   // wall clock, so the same text yields the same notes however the real
   // timers jitter. Real time only decides WHEN a planned event is heard:
   // each word is scheduled at (ambient start + virtualMs).
-  const chordClock = createChordClock(hashText(text));
+  // the mode selects the chord-root set, so the same text in major and in
+  // minor gets genuinely different harmony
+  const chordClock = createChordClock(hashText(text), pieceMood);
   startAmbient(dests, () => stopping, chordClock);
   let timelineOrigin = getAmbientStartTime() ?? performance.now();
   let virtualMs = 0;
@@ -598,6 +606,7 @@ export function resetHarmony() {
   // stale would carry the previous text's evidence count into a new piece —
   // deciding the timbre subset from the wrong text.
   sessionLexiconHits = 1;
+  pieceMood = null;
 }
 
 export function clearAudioState() {
