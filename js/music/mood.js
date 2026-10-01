@@ -19,7 +19,56 @@ const CONTRAST_WORDS = new Set([
   'اما','ولی','هرچند','گرچه',
   'but','however','yet','though','although',
 ]);
-export { CONTRAST_WORDS };
+// ─── Polysemous slang ─────────────────────────────────────────────
+// A few slang phrases are positive about a PERSON and negative about a
+// THING. "The building is on fire" is a disaster; "you are on fire!" is
+// praise. The lexicon cannot express that with a bare entry, because
+// "on fire" as a joy entry at +1.1 scored a burning building at lydian — the
+// single worst error found in this audit.
+//
+// The rule: the slang reading needs a PERSON subject. Without one, the literal
+// reading wins, which means these phrases simply do not match and the text
+// falls through to whatever else it says.
+//
+// This is a closed list of exactly the phrases that were MEASURED
+// mis-scoring. 'killing it' was on it and was removed again: it is not a
+// lexicon entry, so the gate had nothing to allow and the code was dead. The
+// list is not a pattern — it is a record of what broke.
+const PERSON_SUBJECT_SLANG = new Set(['on fire']);
+
+/**
+ * A person subject immediately before the phrase: "I am on fire", "you are on
+ * fire", "he's on fire", "we're on fire". Checked as copula + subject rather
+ * than as a fixed list of full phrases, so "you", "your", "him", "her", "us",
+ * "them" and the contractions all work without being enumerated.
+ */
+const PERSON_SUBJECTS = new Set([
+  'i', 'you', 'he', 'she', 'it', 'we', 'they', 'im', 'youre', 'hes', 'shes',
+  'were', 'theyre', 'ive', 'youve', 'hed', 'shed', 'wed', 'theyd', 'u', 'me',
+  'him', 'her', 'us', 'them', 'one', 'somebody', 'someone', 'everybody',
+]);
+// "you're" arrives as two tokens — you + re — because the tokenizer splits on
+// the apostrophe like any other boundary, and "n\'t" is rewritten to " not"
+// separately. So the copula that survives tokenisation is the bare form.
+const COPULAS = new Set(['am', 'is', 'are', 'was', 'were', 'be', 'being', 'been', 're', 'm', 's', 'll', 've', 'd']);
+
+/**
+ * Is there a person subject immediately before position `i`?
+ * @param {string[]} words — the already-normalized word array
+ * @param {number} i — index where the slang phrase starts
+ */
+export function hasPersonSubjectBefore(words, i) {
+  // "on fire" is two words, so the copula can sit before it: "you are on fire"
+  // (are, on, fire) or be attached: "you're on fire" tokenises as you + re.
+  for (const back of [1, 2]) {
+    const j = i - back;
+    if (j < 0) continue;
+    if (COPULAS.has(words[j]) && j - 1 >= 0 && PERSON_SUBJECTS.has(words[j - 1])) return true;
+  }
+  return false;
+}
+
+export { CONTRAST_WORDS, PERSON_SUBJECT_SLANG };
 
 (function mergeColloquialLexicon() {
   for (const [category, words] of Object.entries(FA_LEXICON_COLLOQUIAL)) {
@@ -291,6 +340,12 @@ export function scanPhraseMatches(words) {
       const span = words.slice(i, i + len).join(' ');
       let hit = PHRASE_LOOKUP[span];
       let consumedLen = len;
+      // Polysemous slang needs a person subject. Without one the literal
+      // reading wins, which means NO match — the text falls through to
+      // whatever else it says rather than being told it is joyful.
+      if (hit && PERSON_SUBJECT_SLANG.has(span) && !hasPersonSubjectBefore(words, i)) {
+        hit = null;
+      }
 
 if (!hit && len >= 3 && i + len < words.length) {
           const loose = looseMatch(words, i, len);
@@ -515,6 +570,9 @@ export function detectMood(text) {
         const span = words.slice(i, i + len).join(' ');
         let hit = PHRASE_LOOKUP[span];
         let consumedLen = len;
+        if (hit && PERSON_SUBJECT_SLANG.has(span) && !hasPersonSubjectBefore(words, i)) {
+          hit = null;
+        }
 
         if (!hit && len >= 3 && i + len < words.length) {
           const loose = looseMatch(words, i, len);

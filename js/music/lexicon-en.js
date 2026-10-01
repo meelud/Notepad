@@ -141,7 +141,11 @@ export const EMOTION_LEXICON = {
     'having a blast','having a ball','living it up','on cloud nine','in seventh heaven',
     'walking on air','feeling great','feeling awesome','feeling amazing',
     'feeling wonderful','feeling incredible','feeling marvelous','feeling splendid','feeling fabulous',
-    'on fire','lit','vibing','grooving','cruising','soaring','floating','gliding',
+    // 'on fire' is here but PERSON_SUBJECT_SLANG in mood.js gates it: the slang
+    // reading needs a person subject. Without the entry there would be nothing
+    // for the gate to allow.
+    'on fire',
+    'lit','vibing','grooving','cruising','soaring','floating','gliding',
     'beaming with joy','grinning from ear to ear','smiling ear to ear','laughing out loud',
     'cracking up','dying of laughter','in stitches','rolling on the floor',
     'having the time of my life','couldn\'t be happier',
