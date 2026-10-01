@@ -203,64 +203,6 @@ function dominantDegreeIndex() {
  *
  * @returns {number} index into currentScale, or -1
  */
-export function thirdDegreeIndex() {
-  const semi = (i) => {
-    const a = currentScale[i];
-    // ratio to the tonic, folded into one octave, as a rounded semitone count
-    return Math.round(12 * Math.log2(a / currentScale[0]));
-  };
-  for (let i = 0; i < currentScale.length; i++) {
-    // the tonic itself may be duplicated in a later octave slot
-    if (semi(i) === 3) return i;
-  }
-  return -1;
-}
-
-/**
- * Guarantees the mode's defining THIRD is heard at least once in a short piece.
- *
- * A two-word text has two notes. If neither lands on the third, the piece does
- * not state its mode at all: dorian and mixolydian both permit the same two
- * pitches in the same register, and a listener has nothing to tell them apart
- * by. That is tolerable over forty notes and not tolerable over two, which is
- * why this applies only to SHORT pieces.
- *
- * Two constraints, both load-bearing:
- *
- *  MELODIC ONLY. The chord/ambient streams are untouched, so no harmony is
- *  wrong — only one melodic note is pointed at a pitch already in the scale.
- *  Neither the note COUNT nor the TIMING is affected: this rewrites a note that
- *  was going to sound anyway, and placeNearest picks the octave nearest the
- *  previous note, so the leap stays within a step or two.
- *
- *  RETURN-SAFE. Returns its input unchanged when the third was already heard,
- *  or when the scale has no third, or when there is no previous note to place
- *  against. Any of those means there is nothing to fix, and rewriting a note
- *  anyway would be changing the piece for no reason.
- *
- * @param {{degree:number, octave:number, freq:number}} prev
- * @param {Array<{degree:number}>} notesPlayedSoFar
- * @param {boolean} isLastNote
- * @returns {{degree:number, octave:number, freq:number}}
- */
-export function ensureThirdHeard(prev, notesPlayedSoFar, isLastNote) {
-  if (!prev) return prev;
-  const third = thirdDegreeIndex();
-  if (third < 0) return prev;
-  const already = notesPlayedSoFar.some(n => n && n.degree === third);
-  if (already) return prev;
-  // only the final note is rewritten, so the substitution is one note and only
-  // ever at the point of resolution, where a step to the third is idiomatic
-  if (!isLastNote) return prev;
-  const placed = placeNearest(third, prev, 0);
-  return { ...placed, lastInterval: 0 };
-}
-
-/**
- * The smallest number of notes for which the third is guaranteed. Below this a
- * piece can go by without ever stating its mode.
- */
-export const THIRD_GUARANTEE_MAX_NOTES = 8;
 
 export function resolveCadence(prev, sentenceType, strength = 1, registerBias = 0) {
   if (strength < 1 && rnd(0, 1) > Math.max(0, Math.min(1, strength))) {

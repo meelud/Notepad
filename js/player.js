@@ -373,7 +373,23 @@ export async function play() {
     // gets a softer, longer note — a natural "landing" instead of an
     // arbitrary cutoff, the way a spoken sentence settles at its end.
     const next = playable[i + 1];
-    const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
+    // THE LAST WORD IS A CADENCE EVEN WITHOUT PUNCTUATION.
+    //
+    // isCadence used to require a following '.', '!' or '?', so it was false
+    // for every text that did not end in a period — and a piece of prose typed
+    // without one is most pieces. resolveCadence then never ran on the final
+    // note and it landed wherever arbitration put it. Measured: 7 of 10 short
+    // texts did not finish on the tonic, and "hey baby i really love you"
+    // ended on degree 5.
+    //
+    // The fix is here rather than as a second mechanism bolted on afterwards,
+    // which is where this would otherwise have gone: the end of the text IS a
+    // cadence point, punctuation or not. A '?' before the end still resolves to
+    // the dominant, and an unpunctuated ending resolves to the tonic, so the
+    // existing resolveCadence does the right thing as soon as it is called.
+    const isLastWord = wordGlobalIndex === totalWordsInText - 1;
+    const isCadence = isLastWord
+      || (next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text));
 
     // sentence position (must be computed before the melody contour
     // block below, which reads sp.pos to detect a new sentence)

@@ -90,7 +90,14 @@ export function simulateText(text) {
     }
 
     const next = playable[i + 1];
-    const isCadence = next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text);
+    // mirrors player.js exactly, including the last-word-is-a-cadence rule.
+    // See the comment at the same line in player.js: isCadence used to require
+    // trailing punctuation, so it was false for most prose and the final note
+    // never resolved. If the two files ever disagree here again, player-parity
+    // is what catches it.
+    const isLastWord = wordGlobalIndex === totalWordsInText - 1;
+    const isCadence = isLastWord
+      || (next && next.type === 'punct' && ['.', '!', '?', '؟'].includes(next.text));
     const sp = sentencePos[i] || { pos: 1, total: 1 };
 
     const wlen = (tok.text.match(/[\p{L}\p{N}]/gu) || []).length || 1;
