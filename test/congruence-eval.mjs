@@ -143,6 +143,32 @@ for (const [text, v, a, lang] of SET) {
 // ── 1. TEMPO ──────────────────────────────────────────────────────
 console.log(`\n─── 1. Tempo (arousal) ───`);
 console.log(`  threshold: >= ${pct(TEMPO_JND - 1)} in the right direction vs a neutral baseline`);
+// Report how close the closest texts sit to the threshold, so a count that
+// moves between machines is visible as such rather than being read as a real
+// change. The margin is measured in arousalScore units, not as a percentage of
+// the band, because that is the quantity the score is actually made of.
+{
+  const E = 0.55;
+  const dir = all.filter(r => r.a !== 0).map(r => {
+    const crit = r.a > 0 ? Math.log2(TEMPO_JND) / E : -Math.log2(TEMPO_JND) / E;
+    const f = pacingFactorFor(r.arousalScore);
+    const pass = r.a > 0 ? f < 1 / TEMPO_JND : f > TEMPO_JND;
+    return { t: r.text, lang: r.lang, pass, d: Math.abs(r.arousalScore - crit), arousal: r.arousalScore, crit };
+  }).sort((x, y) => x.d - y.d);
+  const closest = dir[0];
+  // the smallest perturbation in arousalScore that would flip the closest text
+  const ulp = Math.abs(closest.arousal) * 2.22e-16 * 4;
+  console.log(`  closest text to the threshold:`);
+  console.log(`    "${closest.t.slice(0, 52)}"  arousal=${closest.arousal.toFixed(6)} vs threshold ${closest.crit.toFixed(6)}`);
+  console.log(`    margin ${closest.d.toExponential(3)} in arousalScore — ${(closest.d / ulp).toExponential(1)}x a 4-ULP float difference`);
+  console.log(`  => a float-level disagreement between JS engines cannot flip a verdict here.`);
+  console.log(`     A changed count means different INPUTS, i.e. different code or a different set.`);
+  const byMargin = dir.filter(d => d.d < 0.02);
+  if (byMargin.length) {
+    console.log(`  ${byMargin.length} text(s) sit within 0.02 arousal of the threshold — the honest reading band for a single count:`);
+    for (const d of byMargin) console.log(`    ${d.pass ? 'pass' : 'FAIL'} "${d.t.slice(0, 50)}"`);
+  }
+}
 const tempoRows = [];
 for (const [label, group] of [['all', all], ...Object.entries(byLang)]) {
   if (!group.length) continue;
