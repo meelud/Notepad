@@ -3,7 +3,7 @@
  * Prints per-category entry counts, how many resolved by default, how many
  * are overridden, and cross-checks the numbers the commit message claims.
  */
-import { EMOTION_LEXICON } from '../js/music/mood.js';
+import { EMOTION_LEXICON, MADDA_COLLISIONS } from '../js/music/mood.js';
 import { AROUSAL_OVERRIDES } from '../js/music/lexicon-en.js';
 
 const norm = s => (s.toLowerCase().replace(/[\u200C\u200F\u200E]/g, '')
@@ -70,3 +70,14 @@ console.log(`   override keys naming no real entry: ${bad.length}` + (bad.length
 console.log(`   total entries in the three categories: ${grand.entries}`);
 console.log(`   resolved by default: ${grand.byDefault}   overridden: ${grand.overridden}`);
 console.log(`   FA entries: ${grand.faEntries}   FA overrides: ${grand.faOverridden}`);
+
+// The madda-less fold merges lexicon entries that differ only by آ-vs-ا.
+// mood.js exports the list but deliberately prints nothing — it runs on every
+// import and would put developer bookkeeping in the browser console — so this
+// is one of the two places the report actually surfaces.
+console.log('\n entries merged by the madda-less fold (آ/ا), later spelling wins:');
+if (!MADDA_COLLISIONS.length) console.log('   (none)');
+for (const c of MADDA_COLLISIONS) {
+  console.log(`   "${c.key}"  kept "${c.kept.spelling}" [${c.kept.cat} ${c.kept.weight}]` +
+              `  over "${c.dropped.w}" [${c.dropped.cat} ${c.dropped.weight}]`);
+}

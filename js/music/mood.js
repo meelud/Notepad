@@ -169,11 +169,11 @@ const PHRASE_LOOKUP = (() => {
     console.warn(`arousal: ${unmatched.length} override(s) matched no lexicon entry: ${unmatched.join(', ')}`);
   }
   MADDA_COLLISIONS = maddaCollisions;
-  if (maddaCollisions.length) {
-    console.warn(`mood: ${maddaCollisions.length} lexicon entr(ies) merged by the madda-less fold ` +
-      `(آ/ا); the later spelling wins: ` +
-      maddaCollisions.map(c => `"${c.key}" kept "${c.kept.spelling}" over "${c.dropped.w}"`).join(', '));
-  }
+  // No console output here. This runs on every import, so anyone opening the
+  // app in a browser got four lines of developer bookkeeping before they saw
+  // anything. The collisions are still reported — by test/madda-fold-test.mjs,
+  // which prints them, and by eval/lexicon-reconcile.mjs. The data itself is
+  // exported as MADDA_COLLISIONS, so nothing was lost by not logging it.
   return map;
 })();
 

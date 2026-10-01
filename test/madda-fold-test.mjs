@@ -143,8 +143,10 @@ console.log('\nmadda-less lookup fold\n');
   check('no collision changes the weight or the category', disagree.length === 0,
     disagree.map(c => `${c.key}: kept ${c.kept.cat}/${c.kept.weight}, dropped ${c.dropped.cat}/${c.dropped.weight}`).join('; '));
 
-  // report the actual contents so the list is visible, not just a count
-  console.log('       (merged by the fold — later spelling wins:');
+  // This is where the report lives now. mood.js used to print it on every
+  // import, which put four lines of bookkeeping in the browser console for
+  // anyone opening the app.
+  console.log('       (merged by the madda-less fold — later spelling wins:');
   for (const c of MADDA_COLLISIONS) {
     console.log(`         "${c.key}"  kept "${c.kept.spelling}" [${c.kept.cat} ${c.kept.weight}]  over "${c.dropped.w}" [${c.dropped.cat} ${c.dropped.weight}])`);
   }
