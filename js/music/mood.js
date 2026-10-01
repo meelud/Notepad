@@ -1,5 +1,5 @@
 import { EMOTION_LEXICON, AROUSAL_OVERRIDES } from './lexicon-en.js';
-import { foldPersian } from '../utils/text.js';
+import { foldPersian, extractWords, stripZeroWidth } from '../utils/text.js';
 import { FA_LEXICON_COLLOQUIAL } from './lexicon-fa-colloquial.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
 
@@ -38,9 +38,11 @@ export { CONTRAST_WORDS };
  * Lower-case a lexicon entry and collapse it to space-separated word tokens, so
  * lookup is insensitive to case and punctuation.
  *
- * The zero-width characters are dropped here so a ZWNJ-joined word matches its
- * unjoined spelling. They are NOT dropped in tokenize(), whose offsets index
- * the string buildRender() is handed — see foldPersian() in utils/text.js.
+ * The zero-width characters are dropped so a ZWNJ-joined word matches its
+ * unjoined spelling, and the Arabic yeh/kaf are folded — both by delegating to
+ * extractWords() in utils/text.js, so this and every other extractor in the
+ * codebase cannot drift apart. They are NOT dropped in tokenize(), whose
+ * offsets index the string buildRender() is handed.
  *
  * Arabic yeh/kaf are folded by foldPersian() on the TEXT side instead, at the
  * top of tokenize(), detectMood(), hashText() and scanPhraseMatches():
@@ -51,8 +53,8 @@ export { CONTRAST_WORDS };
  */
 function normalizePhrase(str) {
   return (str.toLowerCase()
-    .replace(/[‌‏‎]/g, '')
-    .match(/[a-zA-Zء-ی]+/g) || []).join(' ');
+    .replace(/[\u200C\u200F\u200E]/g, '')
+    .match(/[a-zA-Z\u0621-\u06CC]+/g) || []).join(' ');
 }
 
 let MAX_PHRASE_LEN = 1;
@@ -132,7 +134,7 @@ export function wordSentimentSign(word) {
 
 /**
  * Scans an array of already-tokenized words (via the same
- * /[a-zA-Zا-ی]+/g extraction detectMood uses) for lexicon PHRASE
+ * extractWords() the same one detectMood uses) for lexicon PHRASE
  * matches, using the identical greedy-longest-match-first strategy
  * (plus the same one-word "loose" skip fallback for 3+ word phrases)
  * that detectMood's inner loop uses on full sentences.
@@ -172,21 +174,36 @@ export function wordSentimentSign(word) {
  * that does so safely, verified against the full snapshot suite, would
  * be welcome).
  *
- * @param {string[]} words — already-lowercased, pre-extracted word tokens (e.g. `sentence.match(/[a-zA-Zا-ی]+/g) || []`)
+ * @param {string[]} words — pre-extracted, lower-cased, folded, ZWNJ-stripped
+ *   word tokens (e.g. `extractWords(sentence)`)
  * @returns {Array<{index:number, length:number, weight:number, tense:number}>}
  *   one entry per match; `length` is how many words (1 or more) the
  *   match consumed starting at `index`, matching detectMood's own
  *   `consumedLen` semantics exactly.
  */
 export function scanPhraseMatches(words) {
-  // Fold here as well as in tokenize()/detectMood(). This function is the
+  // Normalize here as well as in tokenize()/detectMood(). This function is the
   // single entry point to the lexicon, and three modules call it with words
   // they extracted themselves (intention.js's clauseSentiment and
   // deriveSemanticSpans, composition.js's sectionSentimentMagnitude), so
-  // folding only at their callers would mean one of them being forgotten.
-  // foldPersian() is strictly 1:1 in length, so every index below still
-  // refers to the caller's original word array.
-  words = words.map(foldPersian);
+  // normalizing only at their callers would mean one of them being forgotten —
+  // which is exactly how a ZWNJ-joined prefix matched in the mood layer and
+  // not in the contour layer.
+  //
+  // Only the FOLD is applied here, not re-extraction. The caller's word
+  // boundaries are authoritative: they came from WORD_RE, which is the same
+  // regex extractWords() uses, so re-running the extractor over each word
+  // would be a no-op at best — and would silently change the character range
+  // the moment one caller passed words from a different source. An earlier
+  // version of this line re-extracted per word and made "آرامش" resolve in the
+  // span layer while detectMood() still read it as "رامش", moving three gold
+  // texts in one layer only.
+  //
+  // The index arithmetic below is unaffected: this maps a COPY of the array,
+  // and foldPersian() is 1:1 in length. Stripping the ZWNJ does shorten the
+  // copy's strings, but they are only ever used as lookup keys, and the
+  // lexicon keys were stripped the same way in normalizePhrase().
+  words = words.map(w => stripZeroWidth(foldPersian(w)));
   const matches = [];
   let i = 0;
   while (i < words.length) {
@@ -308,13 +325,13 @@ export function detectMood(text) {
   // foldPersian() first, so a text typed with Arabic yeh/kaf scores identically
   // to its Persian spelling — in the mood, and in the notes derived from it.
   const lower = foldPersian(text).toLowerCase().replace(/n['’]t\b/g, ' not');
-  const totalWords = (lower.match(/[a-zA-Zا-ی]+/g) || []).length;
+  const totalWords = extractWords(lower).length;
   let score = 0, tense = 0, arousal = 0;
 
   const sentences = lower.split(/[.!?؟]+/);
 
   for (const sentence of sentences) {
-    const words = sentence.match(/[a-zA-Zا-ی]+/g) || [];
+    const words = extractWords(sentence);
     if (words.length === 0) continue;
 
     const negatorPositions = [];

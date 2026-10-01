@@ -31,8 +31,7 @@
  */
 import { CONTRAST_WORDS, scanPhraseMatches } from './mood.js';
 import { NEGATORS, EMPHASIS_ONLY, NEGATION_WINDOW } from './negators.js';
-
-const WORD_RE = /[a-zA-Zا-ی]+/g;
+import { WORD_RE, extractWords } from '../utils/text.js';
 
 /**
  * Splits text into clause ranges (character offsets), breaking at
@@ -162,8 +161,10 @@ function splitClauses(text) {
  * @param {string} clauseText
  */
 function clauseSentiment(clauseText) {
+  // the "n't" -> " not" rewrite changes length, so it happens on the copy
+  // extractWords() works from and not on the text these offsets came from
   const normalized = clauseText.toLowerCase().replace(/n['’]t\b/g, ' not');
-  const words = normalized.match(WORD_RE) || [];
+  const words = extractWords(normalized);
   const negatorPositions = [];
   words.forEach((w, i) => { if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i); });
   const isNegated = (i, spanLen = 1) => negatorPositions.some(p => (p < i || p >= i + spanLen) && Math.abs(p - i) <= NEGATION_WINDOW);
@@ -239,11 +240,18 @@ export function deriveIntentions(text) {
  * @returns {Array<{start:number, end:number, weight:number}>} sorted by start
  */
 export function deriveSemanticSpans(text) {
-  const re = /[a-zA-Zا-ی]+/g;
+  // WORD_RE, not a private copy: this function needs character offsets as well
+  // as words, so it cannot use extractWords(), but it must still agree with it
+  // on where the words are — otherwise a ZWNJ-joined prefix would resolve here
+  // and not in the mood layer, and the two would disagree about the sentence.
+  // extractWords() strips the ZWNJ from its copy for the lookup; these offsets
+  // index the ORIGINAL text, so the word pushed here keeps its ZWNJ and
+  // scanPhraseMatches folds it a second time.
   const words = [];
   const offsets = [];
   let m;
-  while ((m = re.exec(text))) {
+  WORD_RE.lastIndex = 0;
+  while ((m = WORD_RE.exec(text))) {
     words.push(m[0].toLowerCase());
     offsets.push({ start: m.index, end: m.index + m[0].length });
   }

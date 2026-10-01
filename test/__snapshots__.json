@@ -38,15 +38,15 @@
     },
     "unicode_ellipsis": {
       "mode": "minor",
-      "normScore": -1.1875,
-      "tenseScore": 0.10000000000000002,
-      "arousalScore": -0.5875
+      "normScore": -1.0375,
+      "tenseScore": 0.085,
+      "arousalScore": -0.5275
     },
     "ascii_ellipsis": {
       "mode": "minor",
-      "normScore": -1.1875,
-      "tenseScore": 0.10000000000000002,
-      "arousalScore": -0.5875
+      "normScore": -1.0375,
+      "tenseScore": 0.085,
+      "arousalScore": -0.5275
     },
     "mixed_en_fa": {
       "mode": "lydian",
@@ -292,12 +292,12 @@
     },
     "unicode_ellipsis": {
       "mood": "minor",
-      "root": 138.59131548843604,
+      "root": 146.8323839587038,
       "scaleLength": 7
     },
     "ascii_ellipsis": {
       "mood": "minor",
-      "root": 110,
+      "root": 116.54094037952248,
       "scaleLength": 7
     },
     "mixed_en_fa": {

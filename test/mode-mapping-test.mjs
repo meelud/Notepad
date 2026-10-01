@@ -79,7 +79,17 @@ const E2E = [
   // "!" must not flip angry/afraid text positive (it used to add a flat +0.4 valence)
   ['I am so furious!!! I hate everything about this!!!', c => c.min3],
   ['I am terrified and panicking, please help!!', c => c.min3],
-  ['از دستش خیلی عصبانی‌ام و دیگه نمیخوام ببینمش!!', c => c.min3],
+  // ZWNJ-aware: "عصبانی‌ام" is ONE word. It used to split into "عصبانی" + "ام",
+  // and that stray "ام" pushed "نمیخوام" — a negator — from 3 words away to 4,
+  // outside NEGATION_WINDOW, so the whole sentence scored NEGATIVE and played
+  // locrian. An angry sentence is not a sad one: the negation in it applies to
+  // "ببینمش", not to the anger. Now that the word count is right, the anger
+  // survives and the mode is major.
+  ['از دستش خیلی عصبانی‌ام و دیگه نمیخوام ببینمش!!', c => c.maj3],
+  // Note the space-spelling "عصبانی ام" is NOT asserted equal: it is two
+  // words, not one, so it is a different document and lands outside the
+  // negation window. See test/zwnj-word-test.mjs for the twin comparison,
+  // which uses the joined spelling.
 ];
 for (const [t, ok] of E2E) {
   const m = detectMood(t).mode;

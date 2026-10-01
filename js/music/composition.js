@@ -1,6 +1,6 @@
 import { scanPhraseMatches } from './mood.js';
+import { WORD_RE, extractWords } from '../utils/text.js';
 
-const WORD_RE = /[a-zA-Zا-ی]+/g;
 const SENTENCE_SPLIT_RE = /[.!?؟]+/;
 
 const ROLE_CURVES = {
@@ -49,7 +49,7 @@ function lerp(a, b, t) { return a + (b - a) * smoothstep(t); }
 function sectionSentimentMagnitude(sentences) {
   let sum = 0, count = 0;
   sentences.forEach(s => {
-    const words = s.match(WORD_RE) || [];
+    const words = extractWords(s);
     scanPhraseMatches(words).forEach(({ weight }) => { sum += Math.abs(weight); });
     count += words.length;
   });

@@ -27,6 +27,95 @@ export function foldPersian(s) {
     .replace(/\u0643/g, '\u06A9');
 }
 
+// ─── Word extraction ────────────────────────────────────────────
+/**
+ * The one word extractor. Matches a Latin letter, an Arabic-script letter, or
+ * a ZWNJ, and nothing else.
+ *
+ * U+200C (ZWNJ) is what Persian orthography puts between the two halves of a
+ * prefix: بی‌حس, دل‌تنگ, خسته‌ام, می‌خواهم, نمی‌دانم. It renders as nothing,
+ * which is exactly why a regex of letters only reads it as a word boundary —
+ * "بی‌حس" came out as ["بی", "حس"] and then matched nothing, because the
+ * lexicon entry is written with the ZWNJ in it. Measured on "بی‌حس شدم":
+ * normScore 0.00 with the ZWNJ, -0.50 without. On "دل‌تنگ شدم": 0.00 vs
+ * -0.63. Both are ordinary negative Persian sentences that scored as neutral
+ * and played a neutral mode, purely because of an invisible character.
+ *
+ * Every extractor in the codebase has to agree on this, because they feed
+ * different parts of the same decision — mood.js scores the mood,
+ * intention.js shapes the contour, composition.js sets harmonicStability —
+ * and a split word in only one of them makes the layers disagree about what
+ * the text says. Four separate copies of this regex is how the ZWNJ bug and
+ * then the Arabic yeh/kaf bug got in. So: one regex, exported, used
+ * everywhere.
+ *
+ * ZWNJ is matched but NOT stripped, deliberately. It is a zero-width
+ * character, but removing it changes string length, and token offsets index
+ * the string buildRender() is handed — stripping would slide the highlight
+ * off the word it belongs to. normalizePhrase() strips it for its own lookup,
+ * on a copy.
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+/**
+ * The letter range is ا-ی, exactly as it has always been, plus U+200C. NOT
+ * widened to cover آ (U+0622).
+ *
+ * آ is a known, separate bug: it sits below the ا-ی range, so "آرامش" splits
+ * into "رامش" and matches nothing, even though the lexicon entry is written
+ * "آرامش". Adding آ to this pattern fixes that — and measurably so, three gold
+ * texts move quadrant — but it is not this change, and it must not ride along
+ * silently inside a commit whose whole claim is that texts without a ZWNJ are
+ * untouched. The two bugs are the same shape, and whoever fixes آ should
+ * measure it the way test/zwnj-word-test.mjs measures this one.
+ */
+export const WORD_RE = /[a-zA-Zا-ی‌]+/g;
+
+/**
+ * Strips the zero-width characters (ZWNJ, RLM, LRM). See normalizePhrase()
+ * in mood.js.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+export function stripZeroWidth(s) {
+  return s.replace(/[‌‏‎]/g, '');
+}
+
+/**
+ * The words of `text`, keyed exactly as the lexicon is keyed: lower-cased,
+ * Arabic yeh/kaf folded, zero-width characters stripped.
+ *
+ * Stripping the ZWNJ HERE is safe even though it is not safe in tokenize():
+ * these words are only ever used for lookup, never sliced back out of the
+ * original string. The callers that need character offsets (intention.js's
+ * deriveSemanticSpans) take them from their own scan of the raw text, so
+ * removing a character from the word copy cannot move them.
+ *
+ * This is the point of the shared helper: "بی‌حس شدم" and "بیحس شدم" must
+ * reduce to the same two lookup keys, and both halves of that — the fold and
+ * the strip — have to happen in the same place in every module, or the mood
+ * layer and the contour layer read different sentences.
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function extractWords(text) {
+  return extractWordsKeepZwnj(text).map(stripZeroWidth);
+}
+
+/**
+ * As extractWords(), but keeps the ZWNJ so the caller can still see where a
+ * word was split. For the rare caller that needs to know the difference.
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function extractWordsKeepZwnj(text) {
+  return (text.toLowerCase().match(WORD_RE) || []).map(foldPersian);
+}
+
 // ─── Tokenizer ──────────────────────────────────────────────────
 /**
  * Splits text into tokens (words, spaces, punctuation).

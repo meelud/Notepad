@@ -41,28 +41,46 @@ Run them all before a commit.
 node test/snapshot.mjs          # regression baseline (pure-logic modules)
 node test/snapshot.mjs --update # accept an intentional behaviour change
 node test/evaluate-mood.mjs     # sentiment accuracy report
-node test/mode-mapping-test.mjs # valence x arousal -> mode invariants
-node test/arousal-test.mjs      # arousal -> tempo invariants
+node test/mode-mapping-test.mjs   # valence x arousal -> mode invariants
+node test/arousal-test.mjs        # arousal -> tempo invariants
+node test/zwnj-word-test.mjs      # ZWNJ is inside a word, not a word break
+node test/arabic-fold-test.mjs    # Arabic yeh/kaf cannot change the music
+node test/arousal-lexicon-test.mjs# per-category arousal rule
+node test/congruence-eval.mjs     # tuning-set report (in-sample, not a result)
 ```
 
-**Four of the tests need a loader flag** — they run the real `play()`
-headlessly, so they must be invoked as:
+**Exactly two tests need the loader flag:**
 
 ```bash
-node --import ./test/harness/register.mjs test/determinism-test.mjs       # 24/24
 node --import ./test/harness/register.mjs test/player-parity.mjs         # 106/106
-node --import ./test/harness/register.mjs test/sync-test.mjs              # 12/12
 node --import ./test/harness/register.mjs test/timeline-formula-test.mjs
 ```
 
-Running any of them as plain `node test/<name>.mjs` fails with a loader
-error. The `--import` hook registers `harness/trace-loader.mjs`, which
-wraps `harmony.js` to record melodic decisions without modifying
-production code. The other scripts run directly.
+Everything else in `test/*.mjs` runs as plain `node test/<name>.mjs`.
+
+The `--import` hook registers `harness/trace-loader.mjs`, which wraps
+`harmony.js` to record melodic decisions without modifying production
+code. Only the two tests that read `globalThis.__TRACE__` need it.
+
+Verified by running the whole suite both ways: these two are the only
+tests whose result differs, and both FAIL without the flag rather than
+passing quietly. `determinism-test`, `sync-test`, `dynamics-test` and
+`loudness-formula-test` also run the real `play()`, but they install the
+harness themselves — `loudness-formula-test` calls `installFakeClock()` and
+`installStubs()` directly instead of going through `run-play.mjs`, and
+`determinism-test`/`sync-test`/`dynamics-test` do the same — so the flag is
+redundant for them, not required. Passing them the flag changes nothing
+(assertion counts identical both ways).
+
+The trap worth knowing: `loudness-formula-test` cannot pass vacuously. Its
+first assertion is `gains.length === toks.length`, so a `play()` that
+sounded nothing fails immediately rather than skipping the comparisons.
+The same is true of `timeline-formula-test` — but only with the flag,
+without it the trace is empty and the test reports `play=0 formula=12`.
 
 There is no aggregate runner because a `package.json` would violate the
-no-dependency rule; just loop over `test/*.mjs` and remember the flag
-for the four above.
+no-dependency rule; loop over `test/*.mjs` and pass `--import` for the two
+above.
 
 **The test suite does not cover the browser entry point.** Nothing imports
 `main.js`, `ui.js`, `player.js`, `voices.js`, `ambient.js`, `reverb.js`,
