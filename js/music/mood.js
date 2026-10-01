@@ -188,6 +188,48 @@ export function wordSentimentSign(word) {
  *   match consumed starting at `index`, matching detectMood's own
  *   `consumedLen` semantics exactly.
  */
+
+/**
+ * The one-word "loose" fallback: an entry may be written with a filler word the
+ * text does not have, so a window of `len` words plus one extra is tried with
+ * each word in turn removed, looking for the entry underneath.
+ *
+ * Two rules, both learned from what the unrestricted version did:
+ *
+ * The skipped word must be INTERIOR. Removing the first or the last word turns
+ * the fallback into a way of deleting any word you like. "how are you" is a
+ * casual entry of weight 0, so "darling how are you" matched it with the
+ * leading "darling" removed, consumed all four words, and returned 0.00 — the
+ * same as the phrase on its own. "sad how are you", "furious how are you" and
+ * "happy how are you" all measured 0.00 for the same reason, while "how are
+ * you darling" gave 0.63 because there was nothing to swallow. An emotion word
+ * at either edge must never be deleted by a filler-word heuristic.
+ *
+ * The skipped word must carry no lexicon weight of its own. Even in the middle,
+ * deleting a word that means something trades a real signal for a speculative
+ * one. A weight-0 hit is not a licence to discard whatever is adjacent to it.
+ *
+ * Both layers call this, so the mood and the contour cannot disagree about
+ * which words a phrase consumed.
+ *
+ * @param {string[]} words — the caller's word array (already normalized)
+ * @param {number} i — window start
+ * @param {number} len — window length, before the extra word
+ * @returns {{hit: object}|null}
+ */
+function looseMatch(words, i, len) {
+  const window = words.slice(i, i + len + 1);
+  // interior positions only: index 0 and window.length-1 are excluded
+  for (let skip = 1; skip < window.length - 1; skip++) {
+    const skipped = PHRASE_LOOKUP[window[skip]];
+    if (skipped && skipped.weight !== 0) continue;
+    const candidate = window.slice(0, skip).concat(window.slice(skip + 1)).join(' ');
+    const looseHit = PHRASE_LOOKUP[candidate];
+    if (looseHit) return { hit: looseHit };
+  }
+  return null;
+}
+
 export function scanPhraseMatches(words) {
   // Normalize here as well as in tokenize()/detectMood(). This function is the
   // single entry point to the lexicon, and three modules call it with words
@@ -221,17 +263,13 @@ export function scanPhraseMatches(words) {
       let hit = PHRASE_LOOKUP[span];
       let consumedLen = len;
 
-      if (!hit && len >= 3 && i + len < words.length) {
-        const window = words.slice(i, i + len + 1);
-        for (let skip = 0; skip < window.length; skip++) {
-          const candidate = window.slice(0, skip).concat(window.slice(skip + 1)).join(' ');
-          const looseHit = PHRASE_LOOKUP[candidate];
-          if (looseHit) { hit = looseHit; consumedLen = len + 1; break; }
+if (!hit && len >= 3 && i + len < words.length) {
+          const loose = looseMatch(words, i, len);
+          if (loose) { hit = loose.hit; consumedLen = len + 1; }
         }
-      }
 
-      if (hit) {
-        matches.push({ index: i, length: consumedLen, weight: hit.weight, tense: hit.tense, arousal: hit.arousal });
+        if (hit) {
+          matches.push({ index: i, length: consumedLen, weight: hit.weight, tense: hit.tense, arousal: hit.arousal });
         matchedLen = consumedLen;
         break;
       }
@@ -377,12 +415,8 @@ export function detectMood(text) {
         let consumedLen = len;
 
         if (!hit && len >= 3 && i + len < words.length) {
-          const window = words.slice(i, i + len + 1);
-          for (let skip = 0; skip < window.length; skip++) {
-            const candidate = window.slice(0, skip).concat(window.slice(skip + 1)).join(' ');
-            const looseHit = PHRASE_LOOKUP[candidate];
-            if (looseHit) { hit = looseHit; consumedLen = len + 1; break; }
-          }
+          const loose = looseMatch(words, i, len);
+          if (loose) { hit = loose.hit; consumedLen = len + 1; }
         }
 
         if (hit) {
