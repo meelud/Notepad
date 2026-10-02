@@ -30,6 +30,11 @@ const TRIGGERS = [
     words: ['کیانا', 'kiyana', 'kiyanaaa'],
     message: "You’ve named someone dearly loved by the creator. Hopefully she catches me soon.",
   },
+  {
+  topic: 'robbie',
+  words: ['robbie'],
+  message: "Take care.",
+  },
 ];
 
 let toastTimer = null;
