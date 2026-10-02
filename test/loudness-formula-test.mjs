@@ -33,6 +33,16 @@ const FLOOR_RISE_CADENCE = 0.6640;
 const NEUTRAL_WORD = [0.18, 0.52];
 const NEUTRAL_CADENCE = [0.20, 0.40];
 const CLAMP_LO = 0.12, CLAMP_HI = 0.6;
+
+// The calm ceiling's exponent. Re-derived from the same formula the module
+// documents, not copied from it:
+//   spread_dB at saturation = 20*log10(hi/lo) + 20*(E_CALM-E)*CALM*log10(2)
+// solved for the 3.5 dB target. If dynamics.js changes this, this number
+// must be recomputed rather than edited to match, or the test stops being
+// independent of the thing it checks.
+const CALM_CEILING_EXPONENT = DYNAMICS_EXPONENT
+  + (3.5 - 20 * Math.log10(NEUTRAL_WORD[1] / NEUTRAL_WORD[0]))
+    / (20 * Math.log10(2) * CALM_SATURATION);
 const VOL_ARC_BASE = 0.85, VOL_ARC_DEPTH = 0.3;
 
 function expectedWindow(arousal, isCadence) {
@@ -42,9 +52,15 @@ function expectedWindow(arousal, isCadence) {
     return { lo: lo + (hi - lo) * k * Math.tanh(arousal), hi };
   }
   if (arousal < 0) {
+    // The window NARROWS toward the floor: the ceiling falls faster than the
+    // floor, which is what a calm passage should sound like. Scaling both
+    // bounds by one factor leaves the ratio — and so the spread in dB —
+    // exactly where it started.
     const s = Math.max(arousal, CALM_SATURATION);
-    const k = Math.pow(2, DYNAMICS_EXPONENT * s);
-    return { lo: lo * k, hi: hi * k };
+    return {
+      lo: lo * Math.pow(2, DYNAMICS_EXPONENT * s),
+      hi: hi * Math.pow(2, CALM_CEILING_EXPONENT * s),
+    };
   }
   return { lo, hi };
 }

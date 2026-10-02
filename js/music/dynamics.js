@@ -45,6 +45,17 @@ export const DYNAMICS_FLOOR = 0.75;
  */
 const CALM_SATURATION = -0.42;
 
+/**
+ * The ceiling's exponent, used ONLY for arousal < 0. See velocityRange().
+ *
+ * DERIVATION: a target spread S_dB at saturation requires
+ *   E_CALM = DYNAMICS_EXPONENT + (S_dB - 20*log10(hi/lo)) / (20*log10(2) * CALM_SATURATION)
+ * With S = 3.5 dB, hi/lo = 52/18 (9.21 dB) and CALM_SATURATION = -0.42 that is
+ * 2.88. The nominal 3.5 dB target is inside the 3-4 dB band the brief asks for,
+ * and 2.88 falls out of it rather than being picked and then justified.
+ */
+export const CALM_CEILING_EXPONENT = 2.88;
+
 export function saturateDynamics(arousal) {
   if (arousal >= 0) return Math.tanh(arousal);
   return Math.max(arousal, CALM_SATURATION);
@@ -109,8 +120,36 @@ export function velocityRange(arousal, isCadence) {
     return { lo: nomLo + rise, hi: nomHi };
   }
   if (arousal < 0) {
-    const k = dynamicsFor(arousal);
-    return { lo: nomLo * k, hi: nomHi * k };
+    // CALM NARROWS ITS WINDOW. Scaling both bounds by one factor left the
+    // window exactly as wide as it started — 0.18..0.52 is 9.21 dB at every
+    // arousal, because a ratio does not change when you multiply it. Measured
+    // with the real play() on "i feel calm and peaceful" over 60 seeds, the
+    // spread between the loudest and quietest word was p10/p50/p90 =
+    // 4.2 / 7.3 / 9.7 dB, and the same sentence spelled "peacful" gave
+    // 0.37 / 0.41 / 0.47 / 0.46 / 0.24 — a calm sentence that was loud on
+    // four of its five words.
+    //
+    // Calm and tender expression carries LOW loudness variability (Juslin &
+    // Laukka 2003), so the fix is that the CEILING falls faster than the
+    // floor. Same law, same saturation curve, one steeper exponent on `hi`:
+    //
+    //   lo' = lo * 2^(0.62 * sat)      unchanged — the floor still descends
+    //   hi' = hi * 2^(2.88 * sat)      steeper   — the ceiling falls away
+    //
+    // 2.88 is derived, not chosen. Spread at saturation is
+    //   20*log10(hi'/lo') = 20*log10(hi/lo) + 20*(E_CALM-0.62)*sat*log10(2)
+    // and the nominal 9.21 dB has to become the ~3.5 dB target, which at
+    // sat = CALM_SATURATION = -0.42 gives E_CALM = 2.88 exactly.
+    //
+    // Monotone and smooth: both bounds are still single exponentials in the
+    // same saturating variable, so nothing can kink, and the ceiling can
+    // never cross the floor — checkVelocityRange() in dynamics-test.mjs
+    // sweeps the whole real range to prove it.
+    const s = saturateDynamics(arousal);
+    return {
+      lo: nomLo * Math.pow(2, DYNAMICS_EXPONENT * s),
+      hi: nomHi * Math.pow(2, CALM_CEILING_EXPONENT * s),
+    };
   }
   return { lo: nomLo, hi: nomHi };
 }
