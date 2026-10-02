@@ -159,6 +159,7 @@ export const EMOTION_LEXICON = {
     'a signal breaking through clean',
   ]},
   love: { weight: 1.0, tense: 0, arousal: 0.1, words: [
+    'would die for you','die for you','i would die for you','my whole life with you',
 
     'stupid in love','crazy about you','can’t get enough of you','you’re my person',
     'my whole heart','soft for you','simping hard','my favorite human',
@@ -206,9 +207,11 @@ export const EMOTION_LEXICON = {
   // tense -0.1 because an endearment sits in the present tense: it is a word
   // for right now, not a memory or an anticipation.
   endearment: { weight: 0.7, tense: -0.1, arousal: -0.1, words: [
+    'my only love','my beloved','sweetie','my sweetie','my lady','my sweet','sweet pea',
 
     'darling','my love','sweetheart','honey','my darling','my sweetheart','my honey',
     'عزیزم','عشقم','جانم','قربونت','عزیز دلم','جان دلم','قربونت برم',
+    'عشق من','عزیز من','قشنگم',
   ]},
 
   // Ambiguous ones. "baby" and "dear" and "babe" are endearments between
@@ -223,6 +226,30 @@ export const EMOTION_LEXICON = {
 
     'baby','dear','babe','babies','my dear',
     'بابا','عزیز','جان','ملقا',
+  ]},
+
+  // ── TENDER ───────────────────────────────────────────────────────
+  // Intimate address between two people who are close: telling someone what
+  // you love about them while lying next to them. Positive valence, clearly
+  // LOW arousal, which is the "content / serene" region of the circumplex
+  // (Russell 1980; Posner, Russell & Peterson 2005), not the "excited" one.
+  // Without this, the joy words inside these phrases (smile, laugh) pull the
+  // arousal up and a quiet confession plays fast and bright.
+  //
+  // Only phrases whose MEANING is closeness live here. Each is a multiword
+  // phrase on purpose: the longest-match rule lets it consume its own joy
+  // word, so "love your smile" is read as one tender phrase and not as
+  // love plus joy. A bare "smile" or "laugh" stays in joy.
+  //
+  // Arousal convention for this category and for gold labels: the energy of
+  // the music that should accompany the text, not the energy of the event.
+  tender: { weight: 0.85, tense: -0.1, arousal: -0.35, words: [
+
+    'love your smile','love your eyes','love your voice','love your laugh','love your hair','love your hands',
+    'your smile','your laugh',
+    'you make me smile','you make me laugh','you make me feel safe','you make me feel at home',
+    'in your arms','hold me close','hold you close','hold your hand','holding your hand',
+    'lying next to you','lying beside you','cuddled up with you','falling asleep next to you',
   ]},
 
   calm: { weight: 0.7, tense: -0.3, arousal: -0.5, words: [
@@ -285,6 +312,8 @@ export const EMOTION_LEXICON = {
     'a frequency worth waiting for','something still transmitting','a door left slightly open',
   ]},
   sadness: { weight: -1.0, tense: 0.1, arousal: -0.4, words: [
+    'i miss you','miss you','missing you','missed you','i miss her','i miss him','miss you so much','i really miss you',
+    'ashamed','ashamed of myself','shame','shameful','humiliated','worthless','ugly','feel ugly',
 
     'in my feelings','not my best day','running on empty','emotionally drained',
     'heavy heart today','just not okay right now','struggling a bit','off today',
