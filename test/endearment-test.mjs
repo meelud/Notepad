@@ -179,6 +179,20 @@ console.log('\nendearments\n');
     EMOTION_LEXICON.love.weight > EMOTION_LEXICON.endearment.weight);
 }
 
+// A greeting + "baby/babe/dear" is a person being addressed, not a child and
+// not a feeling, so it is scored as a full endearment ("hey baby" reads like
+// "hey darling"). The bare word stays soft: "the baby is crying" is a child.
+{
+  console.log('\nvocative greeting + endearment\n');
+  const norm = t => detectMood(t).normScore;
+  check('"hey baby" is a full endearment, same as "hey darling"',
+    Math.abs(norm('hey baby') - norm('hey darling')) < 0.1, `${norm('hey baby').toFixed(2)} vs ${norm('hey darling').toFixed(2)}`);
+  check('"hello dear" and "hi baby" match too',
+    norm('hello dear') >= 0.35 && norm('hi baby') >= 0.35);
+  check('bare "baby" stays soft', norm('baby') < 0.3, `${norm('baby').toFixed(2)}`);
+  check('"the baby is crying" does not become an endearment', norm('the baby is crying') < 0);
+}
+
 if (failed) {
   console.log(`\n${failed} FAILED`);
   process.exit(1);

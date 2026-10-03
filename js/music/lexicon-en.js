@@ -207,6 +207,7 @@ export const EMOTION_LEXICON = {
   // tense -0.1 because an endearment sits in the present tense: it is a word
   // for right now, not a memory or an anticipation.
   endearment: { weight: 0.7, tense: -0.1, arousal: -0.1, words: [
+    'hey baby','hi baby','hello baby','hey babe','hi babe','hello babe','hey dear','hi dear','hello dear',
     'my only love','my beloved','sweetie','my sweetie','my lady','my sweet','sweet pea',
 
     'darling','my love','sweetheart','honey','my darling','my sweetheart','my honey',
