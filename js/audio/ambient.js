@@ -2,6 +2,7 @@ import { ac } from './context.js';
 import { getPadSend } from './reverb.js';
 // the ambient bed's own randomness lives on its OWN stream (utils/rng.js)
 import { arnd as rnd, apick as pick } from '../utils/rng.js';
+import { mulberry32, noiseSeed } from '../utils/prng.js';
 import { BEAT_SEC, BEAT_MS, BAR_BEATS, createChordClock } from '../music/rhythm.js';
 import { currentScale, chordFromScale, currentMood } from '../music/harmony.js';
 import { pentChordPitches } from '../music/pent-parent.js';
@@ -130,7 +131,8 @@ export function startAmbient(dests, isStopping, chordClock = createChordClock(1)
   function playTapeWarmth(dur) {
     const buf = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate);
     const d = buf.getChannelData(0);
-    for (let j = 0; j < d.length; j++) d[j] = (rnd(0, 2) - 1) * 0.4;
+    const nz = mulberry32(noiseSeed(rnd)); // ONE stream draw; length-independent
+    for (let j = 0; j < d.length; j++) d[j] = (nz() * 2 - 1) * 0.4;
     const src = c.createBufferSource(); src.buffer = buf;
     const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.5;
     const g = c.createGain();

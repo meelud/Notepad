@@ -2,6 +2,7 @@ import { ac } from './context.js';
 import { getReverbNode } from './reverb.js';
 // timbre randomness lives on the RENDER stream (see utils/rng.js)
 import { rrnd as rnd, rpick as pick } from '../utils/rng.js';
+import { mulberry32, noiseSeed } from '../utils/prng.js';
 
 /**
  * 22 synthesizer voice types — each is a function(freq, vol, dur, dests)
@@ -104,7 +105,8 @@ export const VOICES = [
     });
     const buf = c.createBuffer(1, Math.ceil(c.sampleRate*0.02), c.sampleRate);
     const bd = buf.getChannelData(0);
-    for (let i = 0; i < bd.length; i++) bd[i] = (rnd(0,2)-1)*Math.exp(-i/(c.sampleRate*0.004));
+    const nz = mulberry32(noiseSeed(rnd)); // ONE stream draw; length-independent
+    for (let i = 0; i < bd.length; i++) bd[i] = (nz()*2-1)*Math.exp(-i/(c.sampleRate*0.004));
     const src = c.createBufferSource(); src.buffer = buf;
     const hp = c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1800;
     const ng = c.createGain(); ng.gain.value = vol*0.1;
@@ -178,15 +180,21 @@ export const VOICES = [
   // 10 — Vibraphone
   (freq, vol, dur, dests) => {
     const c = ac(); const rev = getReverbNode();
-    const osc = c.createOscillator(), g = c.createGain();
+    const osc = c.createOscillator(), trem = c.createGain(), g = c.createGain();
     const lfo = c.createOscillator(), lfoGain = c.createGain();
-    lfo.type='sine'; lfo.frequency.value=5.5; lfoGain.gain.value=vol*0.15;
-    lfo.connect(lfoGain); lfoGain.connect(g.gain);
+    // Tremolo lives on its own stage BEFORE the envelope (osc → trem → g).
+    // Summing the LFO onto g.gain (as before) kept +-vol*0.15 alive after the
+    // envelope had decayed to 0.0001, so the tail never died and cut off
+    // with a click. Here the envelope scales the tremolo too.
+    // trem = 1 +- 0.3 reproduces the old depth at note onset (0.15 / 0.5).
+    lfo.type='sine'; lfo.frequency.value=5.5;
+    trem.gain.value = 1; lfoGain.gain.value = 0.3;
+    lfo.connect(lfoGain); lfoGain.connect(trem.gain);
     osc.type='sine'; osc.frequency.value=freq;
     const decay = dur + rnd(1.0,2.0);
     g.gain.setValueAtTime(vol*0.5, c.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime+decay);
-    osc.connect(g); g.connect(rev); dests.forEach(d => g.connect(d));
+    osc.connect(trem); trem.connect(g); g.connect(rev); dests.forEach(d => g.connect(d));
     lfo.start(); osc.start();
     lfo.stop(c.currentTime+decay+0.1); osc.stop(c.currentTime+decay+0.1);
   },
@@ -344,7 +352,8 @@ export const VOICES = [
     const glen = Math.max(0.08, dur*0.5);
     const buf = c.createBuffer(1, Math.ceil(c.sampleRate*glen), c.sampleRate);
     const d = buf.getChannelData(0);
-    for (let j = 0; j < d.length; j++) d[j] = (rnd(0,2)-1)*Math.pow(Math.sin(Math.PI*j/d.length), 0.7);
+    const nz = mulberry32(noiseSeed(rnd)); // ONE stream draw; length-independent
+    for (let j = 0; j < d.length; j++) d[j] = (nz()*2-1)*Math.pow(Math.sin(Math.PI*j/d.length), 0.7);
     const src = c.createBufferSource(); src.buffer = buf;
     const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=freq*2; bp.Q.value=4;
     const g = c.createGain(); g.gain.value = vol*0.4;

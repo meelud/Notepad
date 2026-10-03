@@ -11,6 +11,15 @@ let leadSend = null; // word voices feed here
 let padSend = null;  // ambient pads feed here
 let fxSend = null;   // punctuation feeds here
 
+let live = false;     // false once the current graph has been retired
+let silentBus = null; // never-connected sink: what getters return before any room exists
+
+// A retired room is faded, not cut: its wet return falls to 0 over a few
+// time constants and its nodes are disconnected only after that, so notes
+// still ringing do not lose their wet path with a click.
+const RETIRE_TC = 0.08;   // seconds (exp time constant → ~-76 dB at RETIRE_MS)
+const RETIRE_MS = 700;
+
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // ─── Internal graph helpers ──────────────────────────────────────
@@ -73,10 +82,15 @@ function applyProfile(c, profile, seed) {
 // getReverbNode() is kept for voices.js backward compatibility — it now
 // returns the LEAD send bus (word voices), so existing voice code that
 // does `g.connect(rev)` routes through the per-role send unchanged.
-export function getReverbNode() { return leadSend; }
-export function getLeadSend() { return leadSend; }
-export function getPadSend() { return padSend; }
-export function getFxSend() { return fxSend; }
+// Getters NEVER return null: before the first room (or if a voice fires
+// between a reset and a rebuild) they hand back a send that is either the
+// retired room (fading out) or a silent unconnected bus, so `g.connect(rev)`
+// cannot throw a TypeError.
+const bus = n => n || silentBus || (silentBus = ac().createGain());
+export function getReverbNode() { return bus(leadSend); }
+export function getLeadSend() { return bus(leadSend); }
+export function getPadSend() { return bus(padSend); }
+export function getFxSend() { return bus(fxSend); }
 
 /**
  * Creates (or rebuilds) the reverb room for a perceptual state.
@@ -87,10 +101,14 @@ export function getFxSend() { return fxSend; }
  */
 export function ensureReverb(dests, state = {}, seed = 0xCAFE) {
   const c = ac();
-  resetReverb();
+  // Build the NEW room completely (synchronously, so no caller can observe a
+  // half-built one), then retire the old. The old room is never torn down
+  // before the new one exists.
+  resetReverb();            // fades + schedules disconnect of the old room
   buildGraph(c, dests);
   const profile = computeReverbProfile(state);
   applyProfile(c, profile, seed);
+  live = true;
 }
 
 /**
@@ -103,7 +121,7 @@ export function ensureReverb(dests, state = {}, seed = 0xCAFE) {
  * @param {Object} state { normScore, density, energy, frequency? }
  */
 export function updateReverb(state = {}) {
-  if (!wetGain || !erGain) return;
+  if (!live || !wetGain || !erGain) return;
   const c = ac();
   const profile = computeReverbProfile(state);
   const t = c.currentTime;
@@ -116,16 +134,21 @@ export function updateReverb(state = {}) {
   fxSend.gain.setTargetAtTime(profile.roleSend.fx * regMod, t, k);
 }
 
+/**
+ * Retires the current room: fade its wet return to 0, disconnect after the
+ * fade. Idempotent. The module refs are left pointing at the retired room
+ * (silent and harmless) rather than nulled, so getters stay non-null.
+ */
 export function resetReverb() {
-  reverbNodes.forEach(n => {
-    try { n.disconnect(); } catch (e) {}
-  });
+  live = false;
+  if (!reverbNodes.length) return;
+  const old = reverbNodes, oldWet = wetGain;
   reverbNodes = [];
-  erConv = null;
-  tailConv = null;
-  wetGain = null;
-  erGain = null;
-  leadSend = null;
-  padSend = null;
-  fxSend = null;
+  try {
+    const c = ac();
+    if (oldWet) oldWet.gain.setTargetAtTime(0, c.currentTime, RETIRE_TC);
+  } catch (e) {}
+  setTimeout(() => {
+    old.forEach(n => { try { n.disconnect(); } catch (e) {} });
+  }, RETIRE_MS);
 }
