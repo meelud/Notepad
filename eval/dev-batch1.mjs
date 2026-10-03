@@ -18,7 +18,7 @@ export const GOLD = [
  ["I know I'm ugly", -1, 1, 'en'],
  ["say my name", 1, -1, 'en'],
  ["my only love", 1, -1, 'en'],
- ["my dear", 1, -1, 'en'],
+ ["my deer", 1, -1, 'en'],
  ["my sexy lady", 1, -1, 'en'],
  ["my joy", 1, -1, 'en'],
  ["سرم درد میکنه", -1, -1, 'fa'],

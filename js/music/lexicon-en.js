@@ -224,7 +224,7 @@ export const EMOTION_LEXICON = {
   // appears in both readings cannot be filed under either.
   endearment_soft: { weight: 0.35, tense: -0.1, arousal: -0.1, words: [
 
-    'baby','dear','babe','babies','my dear',
+    'baby','dear','babe','babies','my dear','my deer',
     'بابا','عزیز','جان','ملقا',
   ]},
 
