@@ -40,6 +40,7 @@ export async function load(url, context, next) {
     }
     export function resolveCadence(...a) { return rec('cad', {}, real.resolveCadence(...a)); }
     export function motifNote(...a) { return rec('motif', {}, real.motifNote(...a)); }
+    export function repeatNote(...a) { return rec('rep', {}, real.repeatNote(...a)); }
   `;
   return { format: 'module', source, shortCircuit: true };
 }

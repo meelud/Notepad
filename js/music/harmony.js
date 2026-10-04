@@ -208,7 +208,9 @@ export function resolveCadence(prev, sentenceType, strength = 1, registerBias = 
   if (strength < 1 && rnd(0, 1) > Math.max(0, Math.min(1, strength))) {
     return stepwiseNote(prev, 0.3);
   }
-  const target = sentenceType === 'question' ? dominantDegreeIndex() : 0;
+  // 'half' is a phrase-internal half cadence (comma, semicolon, colon; see
+  // music/phrasing.js): it lands on the dominant, exactly like a question.
+  const target = (sentenceType === 'question' || sentenceType === 'half') ? dominantDegreeIndex() : 0;
   return placeNearest(target, prev, registerBias);
 }
 
@@ -373,6 +375,20 @@ export function motifNote(motif, startDegree, wordIdx, prev) {
   let degree = startDegree;
   for (let i = 0; i < wordIdx && i < motif.intervals.length; i++) degree += motif.intervals[i];
   return placeNearest(degree, prev);
+}
+
+/**
+ * Melodic repetition: restates a note's SCALE DEGREE, placed in whichever
+ * octave is nearest the previous note (registerBias as in placeNearest).
+ * Repeating degrees rather than absolute pitches keeps the contour intact
+ * while never creating a register jump into the repeat. No RNG: a copy must
+ * be a copy. See music/phrasing.js.
+ * @param {{degree:number}} srcNote  the note sounded for the source word
+ * @param {{degree:number, octave:number}|null} prev
+ * @param {number} [registerBias=0]
+ */
+export function repeatNote(srcNote, prev, registerBias = 0) {
+  return placeNearest(srcNote.degree, prev, registerBias);
 }
 
 

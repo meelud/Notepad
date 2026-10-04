@@ -4,7 +4,8 @@ import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity, getAmbientStartTime } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote } from './music/harmony.js';
+import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote, repeatNote } from './music/harmony.js';
+import { derivePhrasing } from './music/phrasing.js';
 import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions, deriveSemanticSpans } from './music/intention.js';
 import { deriveComposition } from './music/composition.js';
@@ -305,6 +306,10 @@ export async function play() {
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
   const totalWordsInText = playable.filter(t => t.type === 'word').length;
+  // phrase structure from the text (music/phrasing.js, shared with the test
+  // simulator): half cadences at commas, melodic repetition of repeated text
+  const phrasing = derivePhrasing(playable);
+  const wordNotes = []; // wordNotes[ordinal] = the note sounded for that word
 
   // sentence-position map: for each word token's index in `playable`,
   // record its 1-based position and the total word count of its
@@ -436,8 +441,15 @@ export async function play() {
         : 0;
       const motifAllowed = compState ? compState.motifActive : true;
 
+      const repLink = phrasing.repetitionAt(wordGlobalIndex);
       if (isCadence) {
         note = resolveCadence(lastNote, tok.sentenceType, intention.cadenceStrength, combinedRegisterBias);
+      } else if (phrasing.cadenceKind(i) === 'half') {
+        // comma / semicolon / colon: the phrase ends OPEN, on the dominant
+        note = resolveCadence(lastNote, 'half', 1, combinedRegisterBias);
+      } else if (repLink && wordNotes[repLink.src]) {
+        // the text repeats itself, so the melody repeats (same degrees)
+        note = repeatNote(wordNotes[repLink.src], lastNote, combinedRegisterBias);
       } else if (motifAllowed && sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
         note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
       } else {
@@ -504,6 +516,7 @@ export async function play() {
         }
       }
       lastNote = note;
+      wordNotes[wordGlobalIndex] = note;
       wordIdxInSentence++;
       wordGlobalIndex++;
       return note.freq;

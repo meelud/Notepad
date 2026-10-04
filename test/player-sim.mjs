@@ -16,7 +16,7 @@
  * Output per text: the full sequence of {degree, octave, freq,
  * lastInterval, isCadence, isStrongBeat, sentenceType, wordIdx, path}.
  */
-import { deriveTextHarmony, hashText, resolveCadence, generateMotif,
+import { deriveTextHarmony, hashText, resolveCadence, generateMotif, repeatNote,
          motifSequenceStartDegree, motifNote, globalTensionBias,
          arbitrateMelodyNote, chordFromScale, currentScale } from '../js/music/harmony.js';
 import { wordEmotionWeight } from '../js/music/mood.js';
@@ -25,6 +25,7 @@ import { deriveComposition } from '../js/music/composition.js';
 import { seedRng } from '../js/utils/rng.js';
 import { barIndexAt, isStrongBeatAt, punctPauseFor, wordDurationMs, createChordClock } from '../js/music/rhythm.js';
 import { tokenize } from '../js/utils/text.js';
+import { derivePhrasing } from '../js/music/phrasing.js';
 
 // These mirror player.js's own flags. They must agree: the sim's compState
 // lines have NO null-guard where player.js's do, so the two files only agree
@@ -61,6 +62,8 @@ export function simulateText(text) {
   const tokens = tokenize(text);
   const playable = tokens.filter(t => t.type === 'word' || t.type === 'punct');
   const totalWordsInText = playable.filter(t => t.type === 'word').length;
+  const phrasing = derivePhrasing(playable);
+  const wordNotes = [];
 
   const sentencePos = new Array(playable.length).fill(null);
   {
@@ -147,8 +150,16 @@ export function simulateText(text) {
     let isStrongBeat = null;
     let chordArg = null, contraryArg = null;
 
+    const repLink = phrasing.repetitionAt(wordGlobalIndex);
+    const cadenceKind = phrasing.cadenceKind(i);
+    const isHalf = !isCadence && cadenceKind === 'half';
+    const isRep = !isCadence && !isHalf && !!(repLink && wordNotes[repLink.src]);
     if (isCadence) {
       note = resolveCadence(lastNote, tok.sentenceType, intention.cadenceStrength, combinedRegisterBias);
+    } else if (isHalf) {
+      note = resolveCadence(lastNote, 'half', 1, combinedRegisterBias);
+    } else if (isRep) {
+      note = repeatNote(wordNotes[repLink.src], lastNote, combinedRegisterBias);
     } else if (motifAllowed && sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) {
       note = motifNote(pieceMotif, sentenceStartDegree, wordIdxInSentence, lastNote);
     } else {
@@ -179,13 +190,15 @@ export function simulateText(text) {
       }
     }
 
-    const path = isCadence ? 'cadence'
+    const path = (isCadence || isHalf) ? 'cadence'
+      : isRep ? 'repetition'
       : (motifAllowed && sentenceUsesMotif && wordIdxInSentence <= pieceMotif.intervals.length) ? 'motif'
       : 'arbitration';
 
     sequence.push({
       degree: note.degree, octave: note.octave, freq: note.freq,
-      lastInterval: note.lastInterval, isCadence, isStrongBeat, chordArg, contraryArg, startMs: wordStartMs,
+      lastInterval: note.lastInterval, isCadence, cadenceKind: isCadence ? 'full' : (isHalf ? 'half' : null),
+      repSrc: isRep ? repLink.src : null, isStrongBeat, chordArg, contraryArg, startMs: wordStartMs,
       sentenceType: tok.sentenceType, wordIdx: wordGlobalIndex,
       cadenceStrength: intention.cadenceStrength, path,
       compRole: compState ? compState.role : null, compTension: compState ? compState.tension : 0, compEnergy: compState ? compState.energy : 0,
@@ -201,6 +214,7 @@ export function simulateText(text) {
     });
 
     lastNote = note;
+    wordNotes[wordGlobalIndex] = note;
     wordIdxInSentence++;
     wordGlobalIndex++;
 

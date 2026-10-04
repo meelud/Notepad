@@ -16,14 +16,15 @@
 import { runPlay } from './harness/run-play.mjs';
 import { simulateText } from './player-sim.mjs';
 import { EVAL_DATASET, LONG_TEXTS } from './eval-dataset-with-long-texts.mjs';
+import { PHRASING_TEXTS } from './phrasing-corpus.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const KIND = { arbitration: 'arb', cadence: 'cad', motif: 'motif' };
+const KIND = { arbitration: 'arb', cadence: 'cad', motif: 'motif', repetition: 'rep' };
 const r4 = x => Math.round(x * 1e4) / 1e4;
 
-const texts = [...EVAL_DATASET.map(x => x[0]), ...LONG_TEXTS];
+const texts = [...EVAL_DATASET.map(x => x[0]), ...LONG_TEXTS, ...PHRASING_TEXTS];
 let bad = 0, notes = 0;
 for (const text of texts) {
   const real = await runPlay(root, text, { jitterSeed: 42, jitterMax: 150 });
