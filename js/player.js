@@ -2,6 +2,7 @@ import { editor, render, bPlay, bStop, bSave } from './dom.js';
 import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { VOICES } from './audio/voices.js';
+import { VOICE_PLAN_ENABLED, planVoice } from './audio/voice-plan.js';
 import { playPunctuation } from './audio/punctuation.js';
 import { startAmbient, clearAmb, setAmbientDensity, getAmbientStartTime } from './audio/ambient.js';
 import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote, repeatNote } from './music/harmony.js';
@@ -182,6 +183,10 @@ function familyForMood(normScore, lexiconHits) {
   return pick([PERCUSSIVE_VOICES, RAMPED_VOICES]);
 }
 
+// Tables handed to audio/voice-plan.js, which decides which voice sounds on
+// which word. The tables stay here, next to the picker they also feed.
+const VOICE_TABLES = { VOICE_GROUPS, DARK_VOICES, BRIGHT_VOICES, PERCUSSIVE_VOICES, RAMPED_VOICES, WARM_VOICES };
+
 // ─── Playback ───────────────────────────────────────────────────
 /**
  * Main playback loop — tokenizes text, derives harmony,
@@ -335,6 +340,12 @@ export async function play() {
 
   let currentFamily = familyForMood(sessionNormScore, sessionLexiconHits);
   let voiceIdx = pickOrchestVoice(VOICE_GROUPS.statement, sessionNormScore, currentFamily, sessionLexiconHits);
+  // voice planning (audio/voice-plan.js): the voice each word sounded in, whether
+  // the previous word ended a phrase on a half cadence, and the section we are in
+  const wordVoices = [];
+  let voicePlanned = false;
+  let lastWordHalf = false;
+  let lastSectionRole = null;
   let lastNote = null; // melodic contour state: {degree, octave, lastInterval} — persists across sentences for register continuity
   let sentenceCycle = 0;       // 1-based count of sentences seen so far
   let wordIdxInSentence = 0;   // 0-based position of the current word within its sentence
@@ -556,7 +567,40 @@ export async function play() {
     // sentence instead of rerolling structure word to word
     if (sp.pos === 1) currentFamily = familyForMood(sessionNormScore, sessionLexiconHits);
 
-    if (rnd(0, 1) < 0.4) {
+    // Drawn on EVERY word in both branches. The picks that follow it are not
+    // the same (the planner picks at phrase starts, the old rule on a 40% coin),
+    // so the two branches leave the render stream in different places — each is
+    // deterministic, but they are not interchangeable mid-comparison.
+    const voiceRoll = rnd(0, 1);
+    if (VOICE_PLAN_ENABLED) {
+      // audio/voice-plan.js: a voice is held for a phrase, repeated text keeps
+      // its voice, the cadence follows intention.cadenceStrength, and the pools
+      // that used to collapse are widened. This word's index: wordGlobalIndex
+      // was already advanced inside the note block above.
+      const curWordIdx = wordGlobalIndex - 1;
+      const planProgress = totalWordsInText > 1 ? curWordIdx / (totalWordsInText - 1) : 0;
+      const planRole = COMPOSITION_LAYER_ENABLED && pieceComposition
+        ? pieceComposition.getStateAt(planProgress).role : null;
+      const sectionChanged = lastSectionRole !== null && planRole !== lastSectionRole;
+      const repLinkForVoice = phrasing.repetitionAt(curWordIdx);
+      voiceIdx = planVoice({
+        prevVoice: voicePlanned ? voiceIdx : null,
+        isPhraseStart: !voicePlanned || sp.pos === 1 || lastWordHalf || sectionChanged,
+        isCadence,
+        cadenceStrength: intention.cadenceStrength,
+        sentenceType: tok.sentenceType,
+        normScore: sessionNormScore,
+        lexiconHits: sessionLexiconHits,
+        family: currentFamily,
+        freq,
+        roll: voiceRoll,
+        repeatVoice: repLinkForVoice ? wordVoices[repLinkForVoice.src] : undefined,
+      }, VOICE_TABLES, pick, pickOrchestVoice);
+      voicePlanned = true;
+      wordVoices[curWordIdx] = voiceIdx;
+      lastWordHalf = phrasing.cadenceKind(i) === 'half';
+      lastSectionRole = planRole;
+    } else if (voiceRoll < 0.4) {
       // cadence words may deliberately cross into the opposite family
       // as a resolution gesture (e.g. a percussive sentence settling
       // into a swelling voice at its very end) — everywhere else,

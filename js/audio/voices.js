@@ -3,13 +3,17 @@ import { getReverbNode } from './reverb.js';
 // timbre randomness lives on the RENDER stream (see utils/rng.js)
 import { rrnd as rnd, rpick as pick } from '../utils/rng.js';
 import { mulberry32, noiseSeed } from '../utils/prng.js';
+import { trimGain } from './voice-trim.js';
 
 /**
  * 22 synthesizer voice types — each is a function(freq, vol, dur, dests)
  * that plays a single note through the Web Audio graph.
  * Voice selection happens in player.js via VOICE_GROUPS.
+ *
+ * The array exported at the bottom wraps each of these with a per-voice level
+ * trim (voice-trim.js). The voices themselves are unchanged.
  */
-export const VOICES = [
+const RAW_VOICES = [
   // 0 — Soft pad
   (freq, vol, dur, dests) => {
     const c = ac(); const rev = getReverbNode();
@@ -382,3 +386,10 @@ export const VOICES = [
     });
   },
 ];
+
+// Level-balanced export. Same signature, same indices, same sound; only the
+// `vol` each voice receives is scaled (see voice-trim.js for why here).
+export const VOICES = RAW_VOICES.map((fn, i) => {
+  const g = trimGain(i);
+  return g === 1 ? fn : (freq, vol, dur, dests) => fn(freq, vol * g, dur, dests);
+});
