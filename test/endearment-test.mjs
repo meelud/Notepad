@@ -193,6 +193,17 @@ console.log('\nendearments\n');
   check('"the baby is crying" does not become an endearment', norm('the baby is crying') < 0);
 }
 
+// Tense carries the meaning: "I miss you" is longing (sad, low arousal), but
+// "I missed you" said on a reunion ("hey baby, how are you, I missed you") is
+// affection. Scoring it as grief turned a warm greeting into a minor-key piece.
+{
+  console.log('\nmiss vs missed\n');
+  const norm = t => detectMood(t).normScore;
+  check('"I miss you" (present) is longing, negative', norm('I miss you') < -0.3, norm('I miss you').toFixed(2));
+  check('"I missed you" (past) is affection, positive', norm('I missed you') > 0.3, norm('I missed you').toFixed(2));
+  check('a greeting that ends "I missed you" is not minor', norm('Hey baby, how are you, I missed you.') > 0.2, norm('Hey baby, how are you, I missed you.').toFixed(2));
+}
+
 if (failed) {
   console.log(`\n${failed} FAILED`);
   process.exit(1);

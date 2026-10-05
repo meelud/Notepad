@@ -251,6 +251,8 @@ export const EMOTION_LEXICON = {
     'you make me smile','you make me laugh','you make me feel safe','you make me feel at home',
     'in your arms','hold me close','hold you close','hold your hand','holding your hand',
     'lying next to you','lying beside you','cuddled up with you','falling asleep next to you',
+    // past tense: said on a reunion it is affection, not grief ("hey baby, I missed you")
+    'i missed you','missed you','i ve missed you',
   ]},
 
   calm: { weight: 0.7, tense: -0.3, arousal: -0.5, words: [
@@ -313,7 +315,7 @@ export const EMOTION_LEXICON = {
     'a frequency worth waiting for','something still transmitting','a door left slightly open',
   ]},
   sadness: { weight: -1.0, tense: 0.1, arousal: -0.4, words: [
-    'i miss you','miss you','missing you','missed you','i miss her','i miss him','miss you so much','i really miss you',
+    'i miss you','miss you','missing you','i miss her','i miss him','miss you so much','i really miss you',
     'ashamed','ashamed of myself','shame','shameful','humiliated','worthless','ugly','feel ugly',
 
     'in my feelings','not my best day','running on empty','emotionally drained',
