@@ -9,9 +9,11 @@
  * derives, for each clause, a small deterministic intention vector:
  *
  *   - contourBias      (-1..1)  local sentiment trajectory vs. the
- *                                previous clause — "is this clause
- *                                more positive or more negative than
- *                                what came right before it"
+ *                                previous clause WITH lexicon evidence —
+ *                                "is this clause more positive or more
+ *                                negative than what came right before
+ *                                it". A clause the lexicon says nothing
+ *                                about gets 0, never a negative drop."
  *   - isDisruption      (bool)   this clause was split off BY a
  *                                contrast word ("but"/"ولی") — a
  *                                genuine semantic pivot point
@@ -169,11 +171,16 @@ function clauseSentiment(clauseText) {
   words.forEach((w, i) => { if (NEGATORS.has(w) && !EMPHASIS_ONLY.has(w)) negatorPositions.push(i); });
   const isNegated = (i, spanLen = 1) => negatorPositions.some(p => (p < i || p >= i + spanLen) && Math.abs(p - i) <= NEGATION_WINDOW);
 
-  let sum = 0;
+  let sum = 0, hits = 0;
   scanPhraseMatches(words).forEach(({ index, length, weight }) => {
+    if (weight === 0) return;
+    hits++;
     sum += isNegated(index, length) ? -weight * 0.85 : weight;
   });
-  return sum;
+  // hits === 0 means the lexicon said NOTHING about this clause. That is
+  // absence of evidence, not a score of zero, and the caller must not
+  // compare it against its neighbours as if it were a real neutral reading.
+  return { sum, hits };
 }
 
 /**
@@ -185,13 +192,25 @@ export function deriveIntentions(text) {
   const ranges = splitClauses(text);
   if (ranges.length === 0) return [];
 
-  const scores = ranges.map(r => clauseSentiment(text.slice(r.start, r.end)));
+  const results = ranges.map(r => clauseSentiment(text.slice(r.start, r.end)));
   const NORM = 2.0; // typical single-word lexicon weight magnitude ~1.0-1.5; this keeps bias in a sane range before clamping
 
+  // Score of the most recent clause that actually had lexicon evidence.
+  // A clause with no evidence gets contourBias 0 and does not move this,
+  // so "I love you. The table is wooden. I love it." compares the third
+  // clause with the first, not with a fake neutral dip in between.
+  let refScore = null;
+
   return ranges.map((r, i) => {
-    const prevScore = i === 0 ? scores[i] : scores[i - 1];
-    const rawBias = (scores[i] - prevScore) / NORM;
-    const contourBias = Math.max(-1, Math.min(1, rawBias));
+    const { sum, hits } = results[i];
+    let contourBias = 0;
+    if (hits > 0) {
+      // first clause: no previous clause, bias 0. Later clause with no
+      // earlier evidence anywhere: compare against neutral (0), as before.
+      const prevScore = i === 0 ? sum : (refScore === null ? 0 : refScore);
+      contourBias = Math.max(-1, Math.min(1, (sum - prevScore) / NORM));
+      refScore = sum;
+    }
     const cadenceStrength = r.isSentenceEnd ? Math.max(0, 1 - Math.abs(contourBias)) : 1;
     return {
       start: r.start,

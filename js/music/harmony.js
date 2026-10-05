@@ -187,8 +187,9 @@ function dominantDegreeIndex() {
  * when a clause's meaning doesn't cleanly resolve (e.g. an ambiguous
  * or contradictory ending), forcing a full harmonic resolution would
  * be dishonest to the text — so at low strength, resolution is
- * probabilistically skipped in favor of ordinary stepwise motion,
- * leaving the phrase genuinely "unresolved" (an unstable cadence).
+ * probabilistically skipped, and the phrase lands on the mode's third
+ * or fifth (see weakCadenceNote) instead of the tonic: genuinely
+ * "unresolved" (an unstable cadence), but never on a random degree.
  * strength=1 (default) always resolves — identical to prior behavior.
  *
  * Optional `registerBias` (from intention.js's contourBias): see
@@ -199,14 +200,59 @@ function dominantDegreeIndex() {
  * @param {number} [registerBias=0] — -1..1, soft octave lean
  */
 /**
- * The degree index of the mode's own THIRD, or -1 if the scale has none.
+ * The degree index of the mode's own THIRD (the offset nearest 3.5
+ * semitones: a minor third is 3, a major third is 4), or -1 if the scale
+ * has none within half a semitone of that. Index 0 (the tonic) is never
+ * returned.
  *
  * @returns {number} index into currentScale, or -1
  */
+function thirdDegreeIndex() {
+  const offsets = MODE_OFFSETS[currentMood] || MODE_OFFSETS.minor;
+  let best = -1, bestDist = Infinity;
+  offsets.forEach((o, i) => {
+    if (i === 0) return;
+    const d = Math.abs(o - 3.5);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return bestDist <= 0.5 ? best : -1;
+}
+
+/**
+ * The landing note of a WEAK (unstable) cadence: it still comes to rest on
+ * a chord tone of the tonic triad, the mode's third or its fifth, but not
+ * on the tonic — so the phrase ends open, never on an arbitrary scale
+ * degree. Between the two, whichever is nearer in pitch to `prev` wins
+ * (same voice-leading economy as placeNearest); an exact tie goes to the
+ * third. No RNG: the choice is a pure function of the previous note, the
+ * mode and registerBias.
+ * @param {{degree:number, octave:number}|null} prev
+ * @param {number} registerBias
+ */
+function weakCadenceNote(prev, registerBias) {
+  const third = thirdDegreeIndex();
+  const fifth = dominantDegreeIndex();
+  const targets = [];
+  if (third > 0) targets.push(third);
+  if (fifth > 0 && fifth !== third) targets.push(fifth);
+  if (targets.length === 0) return placeNearest(0, prev, registerBias);
+
+  const prevFreq = prev ? currentScale[prev.degree] * prev.octave : null;
+  let best = null, bestDist = Infinity;
+  targets.forEach(t => {
+    const note = placeNearest(t, prev, registerBias);
+    const dist = prevFreq === null ? 0 : Math.abs(Math.log2(note.freq / prevFreq));
+    if (dist < bestDist - 1e-9) { bestDist = dist; best = note; } // strict: ties keep the earlier (third)
+  });
+  return best;
+}
 
 export function resolveCadence(prev, sentenceType, strength = 1, registerBias = 0) {
+  // Unstable cadence: the gate below is unchanged (so the RNG stream still
+  // advances by exactly one draw here), but the unresolved branch now lands
+  // on the third or fifth instead of an arbitrary step from `prev`.
   if (strength < 1 && rnd(0, 1) > Math.max(0, Math.min(1, strength))) {
-    return stepwiseNote(prev, 0.3);
+    return weakCadenceNote(prev, registerBias);
   }
   // 'half' is a phrase-internal half cadence (comma, semicolon, colon; see
   // music/phrasing.js): it lands on the dominant, exactly like a question.
