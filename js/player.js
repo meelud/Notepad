@@ -1,6 +1,7 @@
 import { editor, render, bPlay, bStop, bSave } from './dom.js';
 import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
+import { createMasterBus } from './audio/master.js';
 import { VOICES } from './audio/voices.js';
 import { VOICE_PLAN_ENABLED, planVoice } from './audio/voice-plan.js';
 import { playPunctuation } from './audio/punctuation.js';
@@ -258,7 +259,11 @@ export async function play() {
     return;
   }
   const sd = c.createMediaStreamDestination();
-  const dests = [c.destination, sd];
+  // audio/master.js: one bus for the whole piece. Speakers and the recorder tap
+  // sit AFTER it, so what you hear, what Save records and what the MP3 export
+  // encodes are the same signal. Every source below connects to master.input.
+  const master = createMasterBus([c.destination, sd]);
+  const dests = [master.input];
 
   // mood-driven reverb space: dark/sad text sits in a more spacious,
   // distant-feeling reverb; bright text stays drier and more present.
@@ -559,8 +564,7 @@ export async function play() {
     // chimes stay centered as the stable "bed" underneath.
     const panner = c.createStereoPanner();
     panner.pan.value = rnd(-0.35, 0.35);
-    panner.connect(c.destination);
-    panner.connect(sd);
+    panner.connect(master.input);
 
     // refresh the sentence's timbral "family" at each new sentence —
     // keeps a stable percussive-vs-swelling identity across the whole
