@@ -161,3 +161,25 @@ playing.
 See the "Known limitations" section of `README.md`. Be honest about them
 rather than hiding them; a limitation that is written down is one nobody
 rediscoveres the hard way.
+
+## Measuring the mix (dev only)
+
+Changes to anything audible — voice levels, the ambient bed, reverb, the master
+bus — are judged by numbers, not by ear alone. The real `play()` is rendered
+offline and measured (peak, true-peak estimate, LUFS, crest, band shares):
+
+```bash
+npm install --no-save node-web-audio-api   # once; node_modules/ is gitignored, the app has no dependencies
+node tools/mix-report.mjs                  # 8 fixed texts (English + Persian), one table
+node tools/mix-report.mjs --compare        # master bus bypassed (A) vs as configured (B)
+node tools/render-offline.mjs --text "..." --wav out.wav   # one text, and listen to it
+```
+
+- `js/audio/mix-metrics.js` is pure and tested (`test/mix-metrics-test.mjs`,
+  calibrated against EBU Tech 3341). The offline renderer is not part of the
+  test suite because it needs the extra package.
+- Re-run the report before AND after a change and quote both tables in the commit
+  message. Re-measure and regenerate `VOICE_TRIM_DB` whenever a voice changes.
+- The tool emulates `setTargetAtTime` because node-web-audio-api 2.2.0 gets it
+  wrong; it self-checks that emulation on every start and refuses to run if off.
+- Not covered: browser compressor/resampler differences and real-time jitter.
