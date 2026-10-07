@@ -1,6 +1,6 @@
 // Punctuation pitches must belong to the piece's key. Exhaustive over every mode
 // and every root candidate harmony.js can choose, then end-to-end through the real
-// playPunctuation() with a recording AudioContext.
+// playPunctuation() with a recording AudioContext, fed the way player.js feeds it.
 import { installStubs } from './harness/stubs.mjs';
 import { MODE_ORDER, buildScale } from '../js/music/scales.js';
 import { punctuationPitches, foldInto } from '../js/music/punct-pitches.js';
@@ -58,7 +58,7 @@ const ctx = { sampleRate: 44100, currentTime: 0, destination: mkNode('dest'),
   createOscillator: () => { const o = mkNode('osc', { type: 'sine', frequency: mkParam(), start() {}, stop() {} }); created.push(o); return o; } };
 installStubs('');
 globalThis.window.AudioContext = function () { return ctx; };
-const { deriveTextHarmony, currentScale } = await import('../js/music/harmony.js');
+const { deriveTextHarmony } = await import('../js/music/harmony.js');
 const { playPunctuation } = await import('../js/audio/punctuation.js');
 const H = await import('../js/music/harmony.js');
 const TEXTS = ['I miss you so much and it hurts.', 'We did it, I cannot believe it!', 'The morning light slid across the table.', 'دلم برات تنگ شده و همه چیز ساکته', 'Get out. Get out right now!'];
@@ -68,7 +68,7 @@ for (const t of TEXTS) {
   const scale = H.currentScale;
   for (const ch of ['!', '?', '؟', '\n', '.', ',']) {
     created.length = 0;
-    playPunctuation(ch, [ctx.destination], 1);
+    playPunctuation(ch, [ctx.destination], 1, punctuationPitches(scale));   // exactly what player.js passes
     const want = (ch === '.' || ch === ',') ? 0 : ch === '!' ? 3 : 1;
     ok(created.length === want, `"${t.slice(0, 18)}…" ${JSON.stringify(ch)}: expected ${want} oscillator(s), got ${created.length}`);
     for (const o of created) for (const f of [o.frequency.value, ...o.frequency.calls]) { played++; ok(toScale(f, scale) < 1e-6, `"${t.slice(0, 18)}…" ${JSON.stringify(ch)} played ${f} Hz, not in the key of the text`); }

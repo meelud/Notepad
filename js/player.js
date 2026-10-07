@@ -5,8 +5,9 @@ import { createMasterBus } from './audio/master.js';
 import { VOICES } from './audio/voices.js';
 import { VOICE_PLAN_ENABLED, planVoice } from './audio/voice-plan.js';
 import { playPunctuation } from './audio/punctuation.js';
+import { punctuationPitches } from './music/punct-pitches.js';
 import { startAmbient, clearAmb, setAmbientDensity, getAmbientStartTime } from './audio/ambient.js';
-import { deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote, repeatNote } from './music/harmony.js';
+import { currentScale, deriveTextHarmony, hashText, resolveCadence, generateMotif, motifSequenceStartDegree, motifNote, globalTensionBias, arbitrateMelodyNote, repeatNote } from './music/harmony.js';
 import { derivePhrasing } from './music/phrasing.js';
 import { wordEmotionWeight } from './music/mood.js';
 import { deriveIntentions, deriveSemanticSpans } from './music/intention.js';
@@ -264,6 +265,8 @@ export async function play() {
   // encodes are the same signal. Every source below connects to master.input.
   const master = createMasterBus([c.destination, sd]);
   const dests = [master.input];
+  // punctuation sounds are chosen from the key the harmony above settled on
+  const punctPitches = punctuationPitches(currentScale);
 
   // mood-driven reverb space: dark/sad text sits in a more spacious,
   // distant-feeling reverb; bright text stays drier and more present.
@@ -375,7 +378,7 @@ export async function play() {
       // Pause lengths: music/rhythm.js punctPauseFor, scaled by tempo.
       virtualMs += punctPauseFor(tok.text, sessionArousalScore);
       const intensity = 0.7 + 0.3;
-      playPunctuation(tok.text, dests, intensity);
+      playPunctuation(tok.text, dests, intensity, punctPitches);
       await waitUntilVirtual(virtualMs);
       continue;
     }

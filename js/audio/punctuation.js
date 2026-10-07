@@ -1,13 +1,18 @@
 import { ac } from './context.js';
 import { getFxSend } from './reverb.js';
-import { currentScale } from '../music/harmony.js';
-import { punctuationPitches } from '../music/punct-pitches.js';
 
-export function playPunctuation(ch, dests, intensity) {
+/**
+ * @param {string} ch
+ * @param {AudioNode[]} dests
+ * @param {number} intensity
+ * @param {{bang:number[], question:{from:number,to:number}, newline:number}} pp
+ *        the piece's punctuation pitches (music/punct-pitches.js), chosen by
+ *        player.js from the key of the text. This module knows nothing about
+ *        keys: like every other audio/ module it plays what it is handed.
+ */
+export function playPunctuation(ch, dests, intensity, pp) {
   const c = ac();
   const rev = getFxSend();
-  // pitches come from the piece's own scale (music/punct-pitches.js), not fixed Hz
-  const pp = punctuationPitches(currentScale);
 
   // Meaningful silence: '.' and ',' no longer strike a lead note. The pause
   // itself (already handled by the timing gap in player.js) IS the punctuation —
