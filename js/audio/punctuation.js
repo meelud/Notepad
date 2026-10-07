@@ -1,9 +1,13 @@
 import { ac } from './context.js';
 import { getFxSend } from './reverb.js';
+import { currentScale } from '../music/harmony.js';
+import { punctuationPitches } from '../music/punct-pitches.js';
 
 export function playPunctuation(ch, dests, intensity) {
   const c = ac();
   const rev = getFxSend();
+  // pitches come from the piece's own scale (music/punct-pitches.js), not fixed Hz
+  const pp = punctuationPitches(currentScale);
 
   // Meaningful silence: '.' and ',' no longer strike a lead note. The pause
   // itself (already handled by the timing gap in player.js) IS the punctuation —
@@ -14,7 +18,7 @@ export function playPunctuation(ch, dests, intensity) {
     return;
 
   } else if (ch === '!') {
-    [523.25, 659.25, 784].forEach((f, i) => {
+    pp.bang.forEach((f, i) => {
       const osc = c.createOscillator(), g = c.createGain();
       osc.type = 'triangle'; osc.frequency.value = f;
       g.gain.setValueAtTime(0.2 * intensity * (1 - i * 0.25), c.currentTime);
@@ -26,8 +30,8 @@ export function playPunctuation(ch, dests, intensity) {
   } else if (ch === '?' || ch === '؟') {
     const osc = c.createOscillator(), g = c.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(293.66, c.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, c.currentTime + 0.35);
+    osc.frequency.setValueAtTime(pp.question.from, c.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(pp.question.to, c.currentTime + 0.35);
     g.gain.setValueAtTime(0.18 * intensity, c.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.5);
     osc.connect(g); g.connect(rev); dests.forEach(d => g.connect(d));
@@ -35,7 +39,7 @@ export function playPunctuation(ch, dests, intensity) {
 
   } else if (ch === '\n') {
     const osc = c.createOscillator(), g = c.createGain();
-    osc.type = 'sine'; osc.frequency.setValueAtTime(73.42, c.currentTime);
+    osc.type = 'sine'; osc.frequency.setValueAtTime(pp.newline, c.currentTime);
     g.gain.setValueAtTime(0.15 * intensity, c.currentTime);
     g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 1.1);
     osc.connect(g); g.connect(rev); dests.forEach(d => g.connect(d));
