@@ -174,6 +174,7 @@ node tools/mix-report.mjs                  # 8 fixed texts (English + Persian), 
 node tools/mix-report.mjs --compare        # master bus bypassed (A) vs as configured (B)
 node tools/render-offline.mjs --text "..." --wav out.wav   # one text, and listen to it
 node tools/stem-report.mjs                 # each layer (ambient / voices / punctuation) alone, plus the full mix
+node tools/measure-wav.mjs piece.wav       # same metrics for ANY wav, e.g. an export from the real browser
 ```
 
 - `js/audio/mix-metrics.js` is pure and tested (`test/mix-metrics-test.mjs`,
@@ -183,4 +184,6 @@ node tools/stem-report.mjs                 # each layer (ambient / voices / punc
   message. Re-measure and regenerate `VOICE_TRIM_DB` whenever a voice changes.
 - The tool emulates `setTargetAtTime` because node-web-audio-api 2.2.0 gets it
   wrong; it self-checks that emulation on every start and refuses to run if off.
-- Not covered: browser compressor/resampler differences and real-time jitter.
+- Not covered: browser compressor/resampler differences and real-time jitter. To check the
+  offline numbers against a real browser, export a piece from the app, convert it
+  (`afconvert -f WAVE -d LEI16 piece.mp3 piece.wav` on macOS) and run measure-wav.mjs on it.
