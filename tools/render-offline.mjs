@@ -13,6 +13,7 @@
 //     node tools/render-offline.mjs --text "I miss you so much."        [--wav out.wav]
 //     node tools/render-offline.mjs --file texts/a.txt --no-master      # A/B: master bus off
 //     node tools/render-offline.mjs --text "..." --master-db 6          # try another makeup gain
+//     node tools/render-offline.mjs --text "..." --stem voices          # solo one layer: ambient | voices | punctuation
 //     node tools/render-offline.mjs --text "..." --max-sec 90 --sr 44100
 //
 // How the offline graph is made faithful to the real-time one:
@@ -49,6 +50,8 @@ if (!text) { console.error('usage: node tools/render-offline.mjs --text "..." | 
 const SR = Number(opt('sr', 44100));
 const MAX_SEC = Number(opt('max-sec', 120));
 const wavOut = opt('wav', null);
+const STEM = opt('stem', null);
+if (STEM && !['ambient', 'voices', 'punctuation'].includes(STEM)) { console.error('--stem must be ambient, voices or punctuation'); process.exit(2); }
 if (flag('no-master')) globalThis.__NOTEPAD_NO_MASTER__ = true;
 if (opt('master-db') !== undefined) globalThis.__NOTEPAD_MASTER_DB__ = Number(opt('master-db'));
 
@@ -122,6 +125,13 @@ function wrapNode(n) {
     n.start = (when, ...r) => start(when === undefined ? now() : when, ...r);
   }
   n.disconnect = () => {};
+  if (STEM && SCHEDULED.has(n.constructor?.name)) {
+    // which layer made this source? the first js/audio/<file>.js frame in the stack.
+    // Reverb is shared on purpose: a solo layer is heard with its own room send.
+    const frame = new Error().stack.split('\n').find(l => /js\/audio\/(ambient|punctuation|voices)\.js/.test(l)) || '';
+    const layer = (frame.match(/(ambient|punctuation|voices)\.js/) || [])[1];
+    if (layer !== STEM) { n.start = () => {}; n.stop = () => {}; }
+  }
   for (const name of PARAMS) {
     let p; try { p = n[name]; } catch { continue; }
     if (p && typeof p.setValueAtTime === 'function') Object.defineProperty(n, name, { value: wrapParam(p), configurable: true });
@@ -166,7 +176,7 @@ L = L.slice(0, end); R = R.slice(0, end);
 
 const M = analyzeMix([L, R], SR);
 if (flag('json')) { console.log(JSON.stringify({ playedSec, ...M })); process.exit(0); }
-console.log(`${flag('no-master') ? 'master OFF' : 'master as configured'}  |  played ${playedSec.toFixed(1)} s  |  rendered ${(end / SR).toFixed(1)} s @ ${SR} Hz`);
+console.log(`${STEM ? 'stem: ' + STEM + ' | ' : ''}${flag('no-master') ? 'master OFF' : 'master as configured'}  |  played ${playedSec.toFixed(1)} s  |  rendered ${(end / SR).toFixed(1)} s @ ${SR} Hz`);
 if (playedSec > MAX_SEC - 2) console.log(`  WARNING: piece (${playedSec.toFixed(0)} s) is close to --max-sec ${MAX_SEC}; raise it`);
 console.log(formatMetrics(M));
 

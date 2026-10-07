@@ -173,6 +173,7 @@ npm install --no-save node-web-audio-api   # once; node_modules/ is gitignored, 
 node tools/mix-report.mjs                  # 8 fixed texts (English + Persian), one table
 node tools/mix-report.mjs --compare        # master bus bypassed (A) vs as configured (B)
 node tools/render-offline.mjs --text "..." --wav out.wav   # one text, and listen to it
+node tools/stem-report.mjs                 # each layer (ambient / voices / punctuation) alone, plus the full mix
 ```
 
 - `js/audio/mix-metrics.js` is pure and tested (`test/mix-metrics-test.mjs`,
