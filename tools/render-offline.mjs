@@ -14,7 +14,7 @@
 //     node tools/render-offline.mjs --file texts/a.txt --no-master      # A/B: master bus off
 //     node tools/render-offline.mjs --text "..." --master-db 6          # try another makeup gain
 //     node tools/render-offline.mjs --text "..." --stem voices          # solo one layer: ambient | voices | punctuation
-//     node tools/render-offline.mjs --text "..." --max-sec 90 --sr 44100
+//     node tools/render-offline.mjs --text "..." --max-sec 90 --sr 48000
 //
 // How the offline graph is made faithful to the real-time one:
 //   • The whole of play() runs first (fast, on virtual time), THEN the graph is
@@ -31,6 +31,12 @@
 //     render up to 1e32 on the reverb's per-word updates. The emulation is
 //     checked against the closed form at startup (selfTestSetTarget) and the tool
 //     refuses to run if it is off by more than 1 %.
+// Sample rate: default 48 kHz. The dry layers are sample-rate independent (measured:
+// identical at 44.1 / 48 / 96 kHz) and so is the reverb impulse response's spectrum, but
+// this engine's ConvolverNode level differs between rates in a way Chromium's documented
+// normalisation (1/rms x 44100/sr) does not predict, so full-mix numbers at 44.1 or 96 kHz
+// can be 2-3 dB off. Compare against a real browser export only at 48 kHz, where the
+// match was checked (~0.75 dB louder offline, same crest and band shares).
 // Not covered: browser-specific DynamicsCompressor implementation differences,
 // and anything that depends on real-time scheduling jitter.
 
@@ -46,8 +52,8 @@ const flag = n => argv.includes(`--${n}`);
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
 
 const text = opt('text') ?? (opt('file') ? fs.readFileSync(opt('file'), 'utf8') : null);
-if (!text) { console.error('usage: node tools/render-offline.mjs --text "..." | --file f.txt [--wav out.wav] [--no-master] [--max-sec 120] [--sr 44100]'); process.exit(2); }
-const SR = Number(opt('sr', 44100));
+if (!text) { console.error('usage: node tools/render-offline.mjs --text "..." | --file f.txt [--wav out.wav] [--no-master] [--max-sec 120] [--sr 48000]'); process.exit(2); }
+const SR = Number(opt('sr', 48000));          // 48 kHz: what the Chrome export was validated at (see header)
 const MAX_SEC = Number(opt('max-sec', 120));
 const wavOut = opt('wav', null);
 const STEM = opt('stem', null);
@@ -176,6 +182,7 @@ L = L.slice(0, end); R = R.slice(0, end);
 
 const M = analyzeMix([L, R], SR);
 if (flag('json')) { console.log(JSON.stringify({ playedSec, ...M })); process.exit(0); }
+if (SR !== 48000 && !flag('json')) console.log(`  note: ${SR} Hz — not the validated rate; reverb level in this engine varies with sample rate (see header)`);
 console.log(`${STEM ? 'stem: ' + STEM + ' | ' : ''}${flag('no-master') ? 'master OFF' : 'master as configured'}  |  played ${playedSec.toFixed(1)} s  |  rendered ${(end / SR).toFixed(1)} s @ ${SR} Hz`);
 if (playedSec > MAX_SEC - 2) console.log(`  WARNING: piece (${playedSec.toFixed(0)} s) is close to --max-sec ${MAX_SEC}; raise it`);
 console.log(formatMetrics(M));

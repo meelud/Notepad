@@ -184,6 +184,9 @@ node tools/measure-wav.mjs piece.wav       # same metrics for ANY wav, e.g. an e
   message. Re-measure and regenerate `VOICE_TRIM_DB` whenever a voice changes.
 - The tool emulates `setTargetAtTime` because node-web-audio-api 2.2.0 gets it
   wrong; it self-checks that emulation on every start and refuses to run if off.
+- Render at 48 kHz (the default): that is where the offline numbers were checked against a
+  real Chrome export (same crest and band shares, ~0.75 dB louder offline). At 44.1 / 96 kHz this
+  engine's reverb level drifts by 2-3 dB, so those numbers are not comparable.
 - Not covered: browser compressor/resampler differences and real-time jitter. To check the
   offline numbers against a real browser, export a piece from the app, convert it
   (`afconvert -f WAVE -d LEI16 piece.mp3 piece.wav` on macOS) and run measure-wav.mjs on it.
