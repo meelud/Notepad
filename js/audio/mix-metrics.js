@@ -14,6 +14,13 @@
  *                             "louder" / "quieter" after a change is a number
  *   rmsDb / crestDb         — unweighted level and peak-to-RMS (how much of the
  *                             loudness is spent on rare peaks)
+ *   aShortMaxDb / aEqDb     — A-weighted level (IEC 61672): the ear's low-frequency
+ *                             insensitivity (~ -19 dB at 100 Hz, -26 dB at 63 Hz).
+ *                             K-weighting (LUFS) only removes content below ~38 Hz,
+ *                             so for a melody sitting at 65-130 Hz it OVERSTATES how
+ *                             loud the melody sounds; A-weighting is the 40-phon
+ *                             equal-loudness proxy. The truth at normal listening
+ *                             levels lies between the two — report both.
  *   bands                   — share of total power per band, from a Welch
  *                             average on the mid signal. `lowMid` (150–500 Hz)
  *                             is the "mud" band where a pad and a melody mask
@@ -99,6 +106,68 @@ export function loudness(chs, fs) {
     if (gated.length) integrated = -0.691 + dbPow(gated.reduce((a, b) => a + b, 0) / gated.length);
   }
   return { lufsI: integrated, lufsMomentaryMax: momMax, lufsShortMax: stMax };
+}
+
+
+// ─── A-weighting (IEC 61672) as a cascade of three biquads ──────────
+// Analog prototype: s^4 / ((s+w1)^2 (s+w2)(s+w3)(s+w4)^2) with poles at
+// 20.599, 107.653, 737.862 and 12194.217 Hz, split into three sections and
+// discretised with the bilinear transform pre-warped at 1 kHz, then normalised
+// to exactly 0 dB at 1 kHz (checked against the IEC table in the test).
+function aWeightCoeffs(fs) {
+  const w = f => 2 * Math.PI * f;
+  const w1 = w(20.598997), w2 = w(107.65265), w3 = w(737.86223), w4 = w(12194.217);
+  // bilinear transform s = c (z-1)/(z+1), pre-warped at 1 kHz. Measured against the
+  // IEC table at 44.1 and 48 kHz: within 0.35 dB from 31.5 Hz to 4 kHz, and about
+  // 0.7 dB too low at 8 kHz (bilinear warping toward Nyquist; per-section pre-warping
+  // and a searched warp frequency were tried and are worse overall). Music made here
+  // has almost no energy above 6 kHz, so the 8 kHz figure does not move the results.
+  const c = w(1000) / Math.tan(w(1000) / (2 * fs));
+  // analog (b2,b1,b0)/(a2,a1,a0) -> digital biquad
+  const bil = (b2, b1, b0, a2, a1, a0) => {
+    const nb0 = b2 * c * c + b1 * c + b0, nb1 = 2 * (b0 - b2 * c * c), nb2 = b2 * c * c - b1 * c + b0;
+    const na0 = a2 * c * c + a1 * c + a0, na1 = 2 * (a0 - a2 * c * c), na2 = a2 * c * c - a1 * c + a0;
+    return { b: [nb0 / na0, nb1 / na0, nb2 / na0], a: [1, na1 / na0, na2 / na0] };
+  };
+  const secs = [
+    bil(1, 0, 0, 1, 2 * w1, w1 * w1),                 // s^2 / (s+w1)^2
+    bil(1, 0, 0, 1, w2 + w3, w2 * w3),                // s^2 / ((s+w2)(s+w3))
+    bil(0, 0, w4 * w4, 1, 2 * w4, w4 * w4),           // w4^2 / (s+w4)^2
+  ];
+  // gain at 1 kHz of the digital cascade
+  const om = 2 * Math.PI * 1000 / fs;
+  let re = 1, im = 0;
+  for (const { b, a } of secs) {
+    const nr = b[0] + b[1] * Math.cos(om) + b[2] * Math.cos(2 * om), ni = -(b[1] * Math.sin(om) + b[2] * Math.sin(2 * om));
+    const dr = a[0] + a[1] * Math.cos(om) + a[2] * Math.cos(2 * om), di = -(a[1] * Math.sin(om) + a[2] * Math.sin(2 * om));
+    const d = dr * dr + di * di, qr = (nr * dr + ni * di) / d, qi = (ni * dr - nr * di) / d;
+    [re, im] = [re * qr - im * qi, re * qi + im * qr];
+  }
+  return { secs, norm: 1 / Math.hypot(re, im) };
+}
+
+export function aWeight(x, fs) {
+  const { secs, norm } = aWeightCoeffs(fs);
+  let y = x;
+  for (const s of secs) y = biquad(y, s);
+  const out = new Float64Array(y.length);
+  for (let i = 0; i < y.length; i++) out[i] = y[i] * norm;
+  return out;
+}
+
+/**
+ * A-weighted levels in dB re full scale (power summed over channels, like the
+ * loudness above but without K-weighting or gating): short-term (3 s) maximum
+ * and the energy mean over the whole file.
+ */
+export function aLevels(chs, fs) {
+  const w = chs.map(c => aWeight(c, fs));
+  const n = w[0].length, win = Math.round(3 * fs), hop = Math.round(0.1 * fs);
+  const pre = w.map(c => { const p = new Float64Array(n + 1); for (let i = 0; i < n; i++) p[i + 1] = p[i] + c[i] * c[i]; return p; });
+  const energy = (s, len) => { let z = 0; for (const p of pre) z += (p[s + len] - p[s]) / len; return z; };
+  let stMax = -Infinity;
+  for (let s = 0; s + win <= n; s += hop) stMax = Math.max(stMax, dbPow(energy(s, win)));
+  return { aShortMaxDb: stMax, aEqDb: dbPow(energy(0, n)) };
 }
 
 // ─── Peaks ──────────────────────────────────────────────────────
@@ -228,6 +297,7 @@ export function analyzeMix(chs, fs) {
     rmsDb: db(rms),
     crestDb: db(peak) - db(rms),
     ...L,
+    ...aLevels(chs, fs),
     bands: bandShares(chs, fs),
   };
 }
@@ -240,6 +310,7 @@ export function formatMetrics(m) {
     `  length        ${m.seconds.toFixed(1)} s`,
     `  peak          ${f1(m.peakDb)} dBFS   true-peak≈ ${f1(m.truePeakDb)}   samples ≥0.999: ${m.clippedSamples}  (>1.0: ${m.overSamples})`,
     `  loudness      ${f1(m.lufsI)} LUFS-I   short-term max ${f1(m.lufsShortMax)}   momentary max ${f1(m.lufsMomentaryMax)}`,
+    `  A-weighted    short-term max ${f1(m.aShortMaxDb)} dB(A)FS   mean ${f1(m.aEqDb)}   (ear-like: bass counts for much less than in LUFS)`,
     `  rms / crest   ${f1(m.rmsDb)} dBFS / ${f1(m.crestDb)} dB`,
     `  band share    sub ${f1(b.sub)}  bass ${f1(b.bass)}  lowMid ${f1(b.lowMid)}  mid ${f1(b.mid)}  presence ${f1(b.presence)}  air ${f1(b.air)}  (dB re total)`,
   ].join('\n');

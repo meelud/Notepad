@@ -28,16 +28,18 @@ function run(text, stem) {
   return JSON.parse(r.stdout.trim().split('\n').pop());
 }
 
-console.log('text         layer        peak  stMax  crest   bass lowMid    mid presence   (stMax = short-term LUFS max)');
-const gap = [];
+console.log('text         layer        peak  stMax  A-max  crest   bass lowMid    mid presence   (stMax = short-term LUFS max, A-max = short-term A-weighted max)');
+const gap = [], gapA = [];
 for (const [name, text] of texts) {
   const rows = {};
   for (const l of LAYERS) {
     const m = run(text, l); rows[l ?? 'full'] = m;
-    console.log(name.padEnd(12) + (l ?? 'full mix').padEnd(12) + f(m.peakDb) + f(m.lufsShortMax) + f(m.crestDb) + f(m.bands.bass) + f(m.bands.lowMid) + f(m.bands.mid) + f(m.bands.presence));
+    console.log(name.padEnd(12) + (l ?? 'full mix').padEnd(12) + f(m.peakDb) + f(m.lufsShortMax) + f(m.aShortMaxDb) + f(m.crestDb) + f(m.bands.bass) + f(m.bands.lowMid) + f(m.bands.mid) + f(m.bands.presence));
   }
   gap.push(rows.voices.lufsShortMax - rows.ambient.lufsShortMax);
-  console.log(' '.repeat(12) + `voices − ambient (short-term max): ${f(gap[gap.length - 1])} LU`);
+  gapA.push(rows.voices.aShortMaxDb - rows.ambient.aShortMaxDb);
+  console.log(' '.repeat(12) + `voices − ambient:  LUFS ${f(gap[gap.length - 1])} LU    A-weighted ${f(gapA[gapA.length - 1])} dB`);
 }
-const ok = gap.filter(Number.isFinite);
-console.log('\nmean voices − ambient: ' + (ok.reduce((a, b) => a + b, 0) / ok.length).toFixed(1) + ' LU   (negative = the melody sits under the bed)');
+const mean = a => { const k = a.filter(Number.isFinite); return k.reduce((x, y) => x + y, 0) / k.length; };
+console.log('\nmean voices − ambient:  LUFS ' + mean(gap).toFixed(1) + ' LU   A-weighted ' + mean(gapA).toFixed(1) + ' dB   (negative = the melody sits under the bed)');
+console.log('range:                 LUFS ' + Math.min(...gap).toFixed(1) + ' … ' + Math.max(...gap).toFixed(1) + '   A-weighted ' + Math.min(...gapA).toFixed(1) + ' … ' + Math.max(...gapA).toFixed(1));

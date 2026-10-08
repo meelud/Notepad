@@ -4,7 +4,7 @@
 //  - the absolute gate: a signal below -70 LUFS is silence for integrated loudness
 //  - band shares put a pure tone in the right band
 //  - clipping counters see what they should
-import { analyzeMix, samplePeak, truePeak, bandShares, loudness } from '../js/audio/mix-metrics.js';
+import { analyzeMix, samplePeak, truePeak, bandShares, loudness, aWeight } from '../js/audio/mix-metrics.js';
 
 let bad = 0;
 const ok = (c, m) => { if (!c) { bad++; console.log(' FAIL ', m); } };
@@ -81,5 +81,19 @@ for (const sr of [48000, 44100]) {
   ok(m.clippedSamples === 4, `samples >=0.999 should be 4, got ${m.clippedSamples}`);
 }
 
+// 8. A-weighting against the IEC 61672 reference table (Class 1 tolerance is about
+//    from 31.5 Hz to 4 kHz we hold 0.35 dB; at 8 kHz the bilinear design reads ~0.7 dB low
+//    (documented in mix-metrics.js; no musical content there), so 1.0 dB is allowed
+{
+  const IEC = [[31.5, -39.4], [63, -26.2], [125, -16.1], [250, -8.6], [500, -3.2], [1000, 0], [2000, 1.2], [4000, 1.0], [8000, -1.1]];
+  for (const sr of [44100, 48000]) for (const [hz, want] of IEC) {
+    const x = sine(hz, 0.5, 6, sr), y = aWeight(x, sr);
+    let a = 0, b = 0; const from = Math.round(2 * sr);            // skip the filter's start-up
+    for (let i = from; i < x.length; i++) { a += x[i] * x[i]; b += y[i] * y[i]; }
+    const got = 10 * Math.log10(b / a);
+    near(got, want, hz >= 8000 ? 1.0 : 0.35, `A-weighting at ${hz} Hz @${sr}`);
+  }
+}
+
 if (bad) { console.log(`${bad} failure(s)`); process.exit(1); }
-console.log('mix-metrics: reference levels, gates, peaks and bands all check out');
+console.log('mix-metrics: reference levels, gates, peaks, bands and A-weighting all check out');
