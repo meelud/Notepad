@@ -14,6 +14,7 @@
 //     node tools/render-offline.mjs --file texts/a.txt --no-master      # A/B: master bus off
 //     node tools/render-offline.mjs --text "..." --master-db 6          # try another makeup gain
 //     node tools/render-offline.mjs --text "..." --stem voices          # solo one layer: ambient | voices | punctuation
+//     node tools/render-offline.mjs --text "..." --comp 0.5 --fg-db 3 --lift-oct 1   # melody register compensation / foreground offset / octave lift
 //     node tools/render-offline.mjs --text "..." --max-sec 90 --sr 48000
 //
 // How the offline graph is made faithful to the real-time one:
@@ -59,6 +60,7 @@ const wavOut = opt('wav', null);
 const STEM = opt('stem', null);
 if (STEM && !['ambient', 'voices', 'punctuation'].includes(STEM)) { console.error('--stem must be ambient, voices or punctuation'); process.exit(2); }
 if (flag('no-master')) globalThis.__NOTEPAD_NO_MASTER__ = true;
+if (['comp', 'fg-db', 'lift-oct'].some(k => opt(k) !== undefined)) globalThis.__NOTEPAD_MIX__ = { comp: opt('comp') !== undefined ? Number(opt('comp')) : undefined, fgDb: opt('fg-db') !== undefined ? Number(opt('fg-db')) : undefined, liftOct: opt('lift-oct') !== undefined ? Number(opt('lift-oct')) : undefined };
 if (opt('master-db') !== undefined) globalThis.__NOTEPAD_MASTER_DB__ = Number(opt('master-db'));
 
 let NWA;

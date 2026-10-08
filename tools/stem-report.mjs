@@ -19,10 +19,13 @@ const argv = process.argv.slice(2);
 const ti = argv.indexOf('--text');
 const texts = ti >= 0 ? [['custom', argv[ti + 1]]] : TEXTS;
 const LAYERS = ['ambient', 'voices', 'punctuation', null];
+// pass-through knobs for the melody: --comp N --fg-db N --lift-oct N
+const pass = [];
+for (const k of ['comp', 'fg-db', 'lift-oct']) { const i = argv.indexOf('--' + k); if (i >= 0) pass.push('--' + k, argv[i + 1]); }
 const f = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : ' -inf').padStart(6);
 
 function run(text, stem) {
-  const args = [path.join(here, 'render-offline.mjs'), '--text', text, '--json', '--max-sec', '150', ...(stem ? ['--stem', stem] : [])];
+  const args = [path.join(here, 'render-offline.mjs'), '--text', text, '--json', '--max-sec', '150', ...(stem ? ['--stem', stem] : []), ...pass];
   const r = spawnSync(process.execPath, args, { encoding: 'utf8', maxBuffer: 1 << 26 });
   if (r.status !== 0) throw new Error(`render failed (${r.status}): ${r.stderr || r.stdout}`);
   return JSON.parse(r.stdout.trim().split('\n').pop());
