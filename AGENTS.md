@@ -185,6 +185,9 @@ node tools/measure-wav.mjs piece.wav       # same metrics for ANY wav, e.g. an e
   message. Re-measure and regenerate `VOICE_TRIM_DB` whenever a voice changes.
 - The tool emulates `setTargetAtTime` because node-web-audio-api 2.2.0 gets it
   wrong; it self-checks that emulation on every start and refuses to run if off.
+- The melody register is fixed by two constants in `js/music/harmony.js` (MELODY_FLOOR_HZ, MELODY_START_MIN_HZ), compared on
+  the corpus with `--melody-floor N --melody-start N` (0 / 0 = the behaviour before the rule). Judge a register or level
+  change by the A-weighted TYPICAL gap in stem-report, not only the maximum: the maximum is blind to quiet low stretches.
 - Render at 48 kHz (the default): that is where the offline numbers were checked against a
   real Chrome export (same crest and band shares, ~0.75 dB louder offline). At 44.1 / 96 kHz this
   engine's reverb level drifts by 2-3 dB, so those numbers are not comparable.

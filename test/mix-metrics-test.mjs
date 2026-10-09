@@ -95,5 +95,20 @@ for (const sr of [48000, 44100]) {
   }
 }
 
+// 9. typical level: a steady tone reads its own level; a burst surrounded by silence reads the
+//    burst, not the silence; and a loud stretch does not hide a quieter long one
+{
+  const { aLevels } = await import('../js/audio/mix-metrics.js');
+  const steady = sine(1000, amp(-20), 12);
+  const a = aLevels([steady, steady], fs);
+  near(a.aTypicalDb, a.aShortMaxDb, 0.05, 'steady tone: typical equals max');
+  const burst = new Float32Array(fs * 30); burst.set(sine(1000, amp(-20), 4), fs * 10);
+  const b = aLevels([burst, burst], fs);
+  ok(b.aTypicalDb > b.aShortMaxDb - 3, `a burst in silence: typical (${b.aTypicalDb.toFixed(1)}) must follow the burst, max ${b.aShortMaxDb.toFixed(1)}`);
+  const mixed = new Float32Array(fs * 30); mixed.set(sine(1000, amp(-10), 3), 0); mixed.set(sine(1000, amp(-22), 24), fs * 4);
+  const m = aLevels([mixed, mixed], fs);
+  ok(m.aShortMaxDb - m.aTypicalDb > 8, `loud 3 s + quiet 24 s: max should sit well above typical (max ${m.aShortMaxDb.toFixed(1)}, typical ${m.aTypicalDb.toFixed(1)})`);
+}
+
 if (bad) { console.log(`${bad} failure(s)`); process.exit(1); }
 console.log('mix-metrics: reference levels, gates, peaks, bands and A-weighting all check out');

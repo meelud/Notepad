@@ -27,6 +27,11 @@
  *
  * Both default to 0 here (= bit-identical to before). tools/render-offline.mjs
  * overrides them with --comp / --fg-db to compare settings on the corpus.
+ *
+ * Status: the register term was measured to be the wrong tool for the lowest notes
+ * (it saturates them: +4.8 dBFS before the ceiling at amount 0.5); the melody
+ * register floor in music/harmony.js (MELODY_FLOOR_HZ) fixes that at the source.
+ * What stays open here is the foreground offset (melody above the bed).
  */
 
 export const REGISTER_COMP_AMOUNT = 0;     // 0 = off, 1 = full A-weighting compensation
@@ -56,17 +61,4 @@ export function voiceLevelGain(freq) {
   const amount = typeof o.comp === 'number' ? o.comp : REGISTER_COMP_AMOUNT;
   const fg = typeof o.fgDb === 'number' ? o.fgDb : FOREGROUND_DB;
   return Math.pow(10, (registerCompDb(freq, amount) + fg) / 20);
-}
-
-/**
- * Whole-piece octave lift of the melody's SOUNDING pitch (experiment, default 0).
- * A constant factor, so the contour and every interval are preserved; melodic
- * decisions (degrees, cadences, voice choice) are made on the unlifted pitch, so
- * parity and determinism are untouched. If it is adopted for good, the right home
- * is the octave sets in music/harmony.js, not this call-site factor.
- */
-export function liftFactor() {
-  const o = globalThis.__NOTEPAD_MIX__ || {};
-  const k = typeof o.liftOct === 'number' ? o.liftOct : 0;
-  return Math.pow(2, k);
 }

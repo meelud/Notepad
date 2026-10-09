@@ -72,7 +72,6 @@ export function deriveTextHarmony(text) {
 export function wordNoteScale() {
   const out = [];
   const modeIdx = MODE_ORDER.indexOf(currentMood);
-  let octaves;
   // Every multiplier must be a POWER OF TWO. They used to include 3 and 6 for
   // the bright modes, which are not octave transpositions: 185 * 3 is 555Hz,
   // an octave-and-a-fifth above, and that pitch is NOT in pentMajor. So on
@@ -83,21 +82,71 @@ export function wordNoteScale() {
   // Measured on "hey baby i love you" before this fix: 2 of 6 melody notes
   // were outside the mode's scale. The range is preserved: 0.5..8 across four
   // octaves is as wide as the old 1..6, and 1..16 for the brightest modes.
-  if (modeIdx <= 4)       octaves = [0.5, 1, 2];
-  else if (modeIdx <= 8)  octaves = [0.5, 1, 2, 4];
-  else if (modeIdx <= 12) octaves = [1, 2, 4, 8];
-  else                    octaves = [1, 2, 4, 8, 16];
+  const octaves = melodyRegisterFor(modeIdx, currentScale[0]).octaves;   // see the register note above
   octaves.forEach(oct => currentScale.forEach(f => out.push(f * oct)));
   return out;
 }
 
+
+// ─── Melody register: a floor, and a starting register ───────────────
+// Two numbers fix the melody's register, both in Hz, both chosen by measurement and
+// by listening (not assumed):
+//   MELODY_FLOOR_HZ     (A2)  no melody note ever sounds below this;
+//   MELODY_START_MIN_HZ (A3)  the melody BEGINS at or above this.
+// Why: the dark modes used to put the melody at 0.5x-2x a 55-104 Hz root, i.e.
+// 27-370 Hz, starting at 55-104 Hz. That is below what laptop speakers or headphones
+// reproduce and 15-25 dB less audible than the same level at 1 kHz (ISO 226), so the
+// melody vanished under the pad exactly where the text was darkest (measured: 8 dB
+// under the bed, A-weighted). Boosting the level instead pushed it to +4.8 dBFS before
+// the ceiling, i.e. into saturation, so the register is what has to move.
+//
+// The rule moves as little as it can:
+//   1. the starting octave is raised by the fewest whole octaves that reach
+//      MELODY_START_MIN_HZ (none, if it already does);
+//   2. the octave set moves with it, so intervals, contour and cadences are intact;
+//   3. octaves whose lowest note would still be under MELODY_FLOOR_HZ are DROPPED, not
+//      shifted: the melody can no longer wander down there, but nothing else moves.
+// Effect over all 192 (mode, root) combinations the engine can pick: 84 untouched,
+// the rest start 1-2 octaves higher (dark modes +2, which is what the listening test
+// preferred) or just lose a sub-A2 octave they rarely used.
+export const MELODY_FLOOR_HZ = 110;
+export const MELODY_START_MIN_HZ = 220;
+
+// Experiment hook, like globalThis.__TRACE__ elsewhere: tools/render-offline.mjs sets
+// --melody-floor / --melody-start so settings can be compared by ear and by number.
+// Setting both to 0 reproduces the behaviour from before this rule.
+function melodyOverride(key, dflt) {
+  const o = globalThis.__NOTEPAD_MELODY__;
+  return o && typeof o[key] === 'number' ? o[key] : dflt;
+}
+
+/** Base octave multipliers per mode index. Powers of two only. */
+function baseOctaves(modeIdx) {
+  if (modeIdx <= 4)  return [0.5, 1, 2];
+  if (modeIdx <= 8)  return [0.5, 1, 2, 4];
+  if (modeIdx <= 12) return [1, 2, 4, 8];
+  return [1, 2, 4, 8, 16];
+}
+
+/**
+ * The octave set and starting octave for a mode whose tonic is `rootHz`.
+ * Pure (exported for test/melody-floor-test.mjs).
+ * @returns {{octaves:number[], startOct:number}}
+ */
+export function melodyRegisterFor(modeIdx, rootHz, floorHz = melodyOverride('floor', MELODY_FLOOR_HZ), startMinHz = melodyOverride('startMin', MELODY_START_MIN_HZ)) {
+  const base = baseOctaves(modeIdx);
+  const start0 = base[Math.floor(base.length / 2)];            // what placeNearest used to start on
+  let f = 1;
+  while (rootHz * start0 * f < startMinHz * (1 - 1e-9)) f *= 2;
+  const octaves = base.map(o => o * f).filter(o => rootHz * o >= floorHz * (1 - 1e-9));
+  return { octaves, startOct: start0 * f };
+}
+
 // ─── Melody helpers (shared internals) ─────────────────────────────
 function octaveRangeForCurrentMood() {
-  const modeIdx = MODE_ORDER.indexOf(currentMood);
   // same powers-of-two requirement as wordNoteScale above — 3 and 6 are not
   // octaves and put non-scale pitches under placeNearest
-  return modeIdx <= 4 ? [0.5, 1, 2] : modeIdx <= 8 ? [0.5, 1, 2, 4]
-       : modeIdx <= 12 ? [1, 2, 4, 8] : [1, 2, 4, 8, 16];
+  return melodyRegisterFor(MODE_ORDER.indexOf(currentMood), currentScale[0]).octaves;
 }
 
 /**
@@ -137,7 +186,7 @@ function placeNearest(targetDegree, prev, registerBias = 0) {
   const octRange = octaveRangeForCurrentMood();
   const baseDegree = ((targetDegree % len) + len) % len;
   if (!prev) {
-    const oct = octRange[Math.floor(octRange.length / 2)];
+    const oct = melodyRegisterFor(MODE_ORDER.indexOf(currentMood), currentScale[0]).startOct;
     return { degree: baseDegree, octave: oct, freq: currentScale[baseDegree] * oct, lastInterval: 0 };
   }
   const prevFreq = currentScale[prev.degree] * prev.octave;
@@ -292,7 +341,7 @@ export function stepwiseNote(prev, tenseScore = 0, directionBias = 0, forceLeap 
   const octRange = octaveRangeForCurrentMood();
 
   if (!prev) {
-    const oct = octRange[Math.floor(octRange.length / 2)];
+    const oct = melodyRegisterFor(MODE_ORDER.indexOf(currentMood), currentScale[0]).startOct;
     return { degree: 0, octave: oct, freq: currentScale[0] * oct, lastInterval: 0 };
   }
 

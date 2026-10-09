@@ -157,8 +157,8 @@ export function aWeight(x, fs) {
 
 /**
  * A-weighted levels in dB re full scale (power summed over channels, like the
- * loudness above but without K-weighting or gating): short-term (3 s) maximum
- * and the energy mean over the whole file.
+ * loudness above but without K-weighting or gating): short-term (3 s) maximum,
+ * the typical (median live-window) level, and the energy mean over the whole file.
  */
 export function aLevels(chs, fs) {
   const w = chs.map(c => aWeight(c, fs));
@@ -166,8 +166,18 @@ export function aLevels(chs, fs) {
   const pre = w.map(c => { const p = new Float64Array(n + 1); for (let i = 0; i < n; i++) p[i + 1] = p[i] + c[i] * c[i]; return p; });
   const energy = (s, len) => { let z = 0; for (const p of pre) z += (p[s + len] - p[s]) / len; return z; };
   let stMax = -Infinity;
-  for (let s = 0; s + win <= n; s += hop) stMax = Math.max(stMax, dbPow(energy(s, win)));
-  return { aShortMaxDb: stMax, aEqDb: dbPow(energy(0, n)) };
+  const perSecond = [];                                              // 3 s windows, 1 s apart
+  for (let s = 0; s + win <= n; s += hop) {
+    const v = dbPow(energy(s, win));
+    stMax = Math.max(stMax, v);
+    if (((s / hop) | 0) % 10 === 0) perSecond.push(v);
+  }
+  // "typical" level: the median of the windows within 20 dB of the loudest one, so a
+  // quiet low-register stretch counts even when the single loudest window is elsewhere
+  // (the short-term MAX is blind to it), and silence between phrases does not.
+  const live = perSecond.filter(v => v > stMax - 20).sort((a, b) => a - b);
+  const aTypicalDb = live.length ? live[Math.floor((live.length - 1) / 2)] : -Infinity;
+  return { aShortMaxDb: stMax, aTypicalDb, aEqDb: dbPow(energy(0, n)) };
 }
 
 // ─── Peaks ──────────────────────────────────────────────────────

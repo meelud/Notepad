@@ -19,9 +19,9 @@ const argv = process.argv.slice(2);
 const ti = argv.indexOf('--text');
 const texts = ti >= 0 ? [['custom', argv[ti + 1]]] : TEXTS;
 const LAYERS = ['ambient', 'voices', 'punctuation', null];
-// pass-through knobs for the melody: --comp N --fg-db N --lift-oct N
+// pass-through knobs for the melody: --comp N --fg-db N --melody-floor N --melody-start N
 const pass = [];
-for (const k of ['comp', 'fg-db', 'lift-oct']) { const i = argv.indexOf('--' + k); if (i >= 0) pass.push('--' + k, argv[i + 1]); }
+for (const k of ['comp', 'fg-db', 'melody-floor', 'melody-start']) { const i = argv.indexOf('--' + k); if (i >= 0) pass.push('--' + k, argv[i + 1]); }
 const f = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : ' -inf').padStart(6);
 
 function run(text, stem) {
@@ -32,7 +32,7 @@ function run(text, stem) {
 }
 
 console.log('text         layer        peak  stMax  A-max  crest   bass lowMid    mid presence   (stMax = short-term LUFS max, A-max = short-term A-weighted max)');
-const gap = [], gapA = [];
+const gap = [], gapA = [], gapT = [];
 for (const [name, text] of texts) {
   const rows = {};
   for (const l of LAYERS) {
@@ -41,8 +41,9 @@ for (const [name, text] of texts) {
   }
   gap.push(rows.voices.lufsShortMax - rows.ambient.lufsShortMax);
   gapA.push(rows.voices.aShortMaxDb - rows.ambient.aShortMaxDb);
-  console.log(' '.repeat(12) + `voices − ambient:  LUFS ${f(gap[gap.length - 1])} LU    A-weighted ${f(gapA[gapA.length - 1])} dB`);
+  gapT.push(rows.voices.aTypicalDb - rows.ambient.aTypicalDb);
+  console.log(' '.repeat(12) + `voices − ambient:  LUFS ${f(gap[gap.length - 1])} LU    A-weighted max ${f(gapA[gapA.length - 1])} dB   typical ${f(gapT[gapT.length - 1])} dB`);
 }
 const mean = a => { const k = a.filter(Number.isFinite); return k.reduce((x, y) => x + y, 0) / k.length; };
-console.log('\nmean voices − ambient:  LUFS ' + mean(gap).toFixed(1) + ' LU   A-weighted ' + mean(gapA).toFixed(1) + ' dB   (negative = the melody sits under the bed)');
+console.log('\nmean voices − ambient:  LUFS ' + mean(gap).toFixed(1) + ' LU   A-weighted max ' + mean(gapA).toFixed(1) + ' dB   typical ' + mean(gapT).toFixed(1) + ' dB   (negative = the melody sits under the bed)');
 console.log('range:                 LUFS ' + Math.min(...gap).toFixed(1) + ' … ' + Math.max(...gap).toFixed(1) + '   A-weighted ' + Math.min(...gapA).toFixed(1) + ' … ' + Math.max(...gapA).toFixed(1));

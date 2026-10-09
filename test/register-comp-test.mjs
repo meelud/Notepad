@@ -1,7 +1,7 @@
 // js/audio/register-comp.js: analytic A-weighting matches the IEC table, the
 // register term has the right shape and limits, and with both knobs at their
 // shipped defaults it is exactly neutral.
-import { aWeightDb, registerCompDb, voiceLevelGain, liftFactor, REGISTER_COMP_AMOUNT, FOREGROUND_DB, REGISTER_COMP_MAX_DB, REGISTER_COMP_MIN_DB } from '../js/audio/register-comp.js';
+import { aWeightDb, registerCompDb, voiceLevelGain, REGISTER_COMP_AMOUNT, FOREGROUND_DB, REGISTER_COMP_MAX_DB, REGISTER_COMP_MIN_DB } from '../js/audio/register-comp.js';
 let bad = 0;
 const ok = (c, m) => { if (!c) { bad++; console.log(' FAIL ', m); } };
 const near = (a, b, tol, m) => ok(Math.abs(a - b) <= tol, `${m}: got ${a}, want ${b} ±${tol}`);
@@ -35,9 +35,6 @@ globalThis.__NOTEPAD_MIX__ = { comp: 1, fgDb: 3 };
 near(voiceLevelGain(1000), Math.pow(10, 3 / 20), 1e-3, 'foreground offset applies (analytic A-weighting is 0 dB at 1 kHz to ~1e-4)');
 near(voiceLevelGain(100), Math.pow(10, (REGISTER_COMP_MAX_DB + 3) / 20), 1e-9, 'register term (capped at 12 dB) and offset add in dB');
 near(voiceLevelGain(250), Math.pow(10, (-aWeightDb(250) + 3) / 20), 1e-9, 'below the cap they add in dB too');
-near(liftFactor(), 1, 0, 'no lift unless asked');
-globalThis.__NOTEPAD_MIX__ = { liftOct: 2 };
-near(liftFactor(), 4, 0, 'liftOct 2 is a factor of 4');
 globalThis.__NOTEPAD_MIX__ = undefined;
 
 if (bad) { console.log(`${bad} failure(s)`); process.exit(1); }
