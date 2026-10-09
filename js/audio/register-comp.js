@@ -21,21 +21,19 @@
  * (tools/stem-report.mjs --comp), not assumed. The cap exists because a +20 dB
  * boost on a 65 Hz sine asks small speakers for something they cannot do.
  *
- * FOREGROUND_DB then lifts every melody note above the bed (a pure level
- * offset: with the register term the spread of the gap is already small, so
- * the offset places it).
  *
- * Both default to 0 here (= bit-identical to before). tools/render-offline.mjs
- * overrides them with --comp / --fg-db to compare settings on the corpus.
+ * REGISTER_COMP_AMOUNT defaults to 0 (off); FOREGROUND_DB to +3 dB, chosen by listening
+ * between 0, +3 and +6 dB. tools/render-offline.mjs overrides both with --comp / --fg-db
+ * to compare settings on the corpus (--fg-db 0 reproduces the level from before).
  *
  * Status: the register term was measured to be the wrong tool for the lowest notes
  * (it saturates them: +4.8 dBFS before the ceiling at amount 0.5); the melody
  * register floor in music/harmony.js (MELODY_FLOOR_HZ) fixes that at the source.
- * What stays open here is the foreground offset (melody above the bed).
+
  */
 
 export const REGISTER_COMP_AMOUNT = 0;     // 0 = off, 1 = full A-weighting compensation
-export const FOREGROUND_DB = 0;
+export const FOREGROUND_DB = 3;           // chosen by listening: 0 / +3 / +6 dB compared, +3 preferred
 export const REGISTER_COMP_MAX_DB = 12;    // boost cap
 export const REGISTER_COMP_MIN_DB = 2;     // how far above 1 kHz may be trimmed (A is +1.3 dB at 2-4 kHz)
 

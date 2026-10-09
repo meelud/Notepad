@@ -2,7 +2,6 @@ import { editor, render, bPlay, bStop, bSave } from './dom.js';
 import { ac, unlockIOSAudio } from './audio/context.js';
 import { ensureReverb, updateReverb, resetReverb } from './audio/reverb.js';
 import { createMasterBus } from './audio/master.js';
-import { voiceLevelGain } from './audio/register-comp.js';
 import { VOICES } from './audio/voices.js';
 import { VOICE_PLAN_ENABLED, planVoice } from './audio/voice-plan.js';
 import { playPunctuation } from './audio/punctuation.js';
@@ -618,8 +617,7 @@ export async function play() {
         : currentFamily;
       voiceIdx = pickOrchestVoice(group, sessionNormScore, pickFamily, sessionLexiconHits);
     }
-    // level follows the note's register (audio/register-comp.js); 1.0 while both knobs are 0
-    VOICES[voiceIdx](freq, vol * voiceLevelGain(freq), dur, [panner]);
+    VOICES[voiceIdx](freq, vol, dur, [panner]);
 
     // word-length → timing: planned by music/rhythm.js wordDurationMs
     // (base 380ms + 42ms per letter, ±15% tempo nudge from the text's

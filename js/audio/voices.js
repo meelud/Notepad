@@ -4,6 +4,7 @@ import { getReverbNode } from './reverb.js';
 import { rrnd as rnd, rpick as pick } from '../utils/rng.js';
 import { mulberry32, noiseSeed } from '../utils/prng.js';
 import { trimGain } from './voice-trim.js';
+import { voiceLevelGain } from './register-comp.js';
 
 /**
  * 22 synthesizer voice types — each is a function(freq, vol, dur, dests)
@@ -388,8 +389,13 @@ const RAW_VOICES = [
 ];
 
 // Level-balanced export. Same signature, same indices, same sound; only the
-// `vol` each voice receives is scaled (see voice-trim.js for why here).
+// `vol` each voice receives is scaled (see voice-trim.js for why here): by the
+// voice's own trim, and by register-comp.js's level for this pitch (the melody's
+// foreground offset). Both live here, in the audio layer, on purpose: the `vol`
+// player.js hands over is what the arousal law in music/dynamics.js produced
+// (test/loudness-formula-test.mjs checks it against the specification, including
+// that it never hits the 0.6 clamp), and calibration must not alter that.
 export const VOICES = RAW_VOICES.map((fn, i) => {
   const g = trimGain(i);
-  return g === 1 ? fn : (freq, vol, dur, dests) => fn(freq, vol * g, dur, dests);
+  return (freq, vol, dur, dests) => fn(freq, vol * g * voiceLevelGain(freq), dur, dests);
 });

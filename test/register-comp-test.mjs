@@ -26,9 +26,13 @@ ok(registerCompDb(3000, 1) >= -REGISTER_COMP_MIN_DB - 1e-9, 'trim above 1 kHz is
 ok(registerCompDb(20, 1) === registerCompDb(40, 1) && registerCompDb(20000, 1) === registerCompDb(4000, 1), 'frequency is clamped to 40..4000 Hz before weighting');
 ok(registerCompDb(NaN, 1) === 0 && registerCompDb(-5, 1) === 0, 'garbage frequency is neutral');
 
-// 3. shipped defaults are neutral
-ok(REGISTER_COMP_AMOUNT === 0 && FOREGROUND_DB === 0, 'defaults are 0 until the corpus-chosen values are set');
-for (const f of [55, 110, 440, 1760]) near(voiceLevelGain(f), 1, 0, `voiceLevelGain(${f}) is exactly 1 at the defaults`);
+// 3. shipped defaults: no register boost, a flat +3 dB foreground offset (chosen by listening)
+ok(REGISTER_COMP_AMOUNT === 0, 'the register boost is off (it saturates the lowest notes; the register rule in harmony.js replaced it)');
+near(FOREGROUND_DB, 3, 0, 'foreground offset is +3 dB');
+for (const f of [55, 110, 440, 1760]) near(voiceLevelGain(f), Math.pow(10, 3 / 20), 1e-12, `voiceLevelGain(${f}) is the flat +3 dB at the defaults`);
+globalThis.__NOTEPAD_MIX__ = { fgDb: 0 };
+for (const f of [55, 440]) near(voiceLevelGain(f), 1, 0, `--fg-db 0 reproduces the old level exactly (${f} Hz)`);
+globalThis.__NOTEPAD_MIX__ = undefined;
 
 // 4. overrides (what the offline tool uses)
 globalThis.__NOTEPAD_MIX__ = { comp: 1, fgDb: 3 };
