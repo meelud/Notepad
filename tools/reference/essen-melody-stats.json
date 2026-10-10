@@ -1,0 +1,36 @@
+{
+  "source": "Essen Folksong Collection (Schaffrath, Dahlig-Turek), via the music21 corpus; aggregate statistics only",
+  "files": 27,
+  "melodies": 8462,
+  "notes": 445551,
+  "intervals": 437089,
+  "sizes": {
+    "unison": 21.20895286772259,
+    "step": 46.831194562205866,
+    "third": 18.943739146947188,
+    "fourthFifth": 10.10389188471913,
+    "large": 2.912221538405222
+  },
+  "meanAbsInterval": 2.277520138919076,
+  "downShare": {
+    "step": 59.26162955435919,
+    "third": 51.97280226084226,
+    "large": 38.856078183224355
+  },
+  "afterLeap": {
+    "reverse": 51.86735490587317,
+    "same": 26.070674647928055,
+    "unison": 22.061970446198778,
+    "n": 138324
+  },
+  "afterStep": {
+    "same": 50.044834465109716,
+    "reverse": 34.02935901827634,
+    "unison": 15.92580651661394,
+    "n": 198508
+  },
+  "leapTowardMean": 49.71831086740209,
+  "rangeMean": 12.819191680453793,
+  "patternDiversity": 0.9086129266520367,
+  "droneShare": 14.200619008822784
+}

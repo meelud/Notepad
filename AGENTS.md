@@ -194,3 +194,19 @@ node tools/measure-wav.mjs piece.wav       # same metrics for ANY wav, e.g. an e
 - Not covered: browser compressor/resampler differences and real-time jitter. To check the
   offline numbers against a real browser, export a piece from the app, convert it
   (`afconvert -f WAVE -d LEI16 piece.mp3 piece.wav` on macOS) and run measure-wav.mjs on it.
+
+## Judging melodies (dev only)
+
+The melody generator is judged against real melodies, with numbers, before any change is proposed:
+
+```bash
+node tools/melody-report.mjs --by-kind     # the generator's melodies vs 8462 Essen folk melodies, flagged at 2 standard errors
+node tools/essen-stats.mjs <dir>            # (re)build tools/reference/essen-melody-stats.json from the Essen .abc files
+```
+
+- Both sides use `js/music/melody-metrics.js` (pure, tested in `test/melody-metrics-test.mjs`), so a difference is a
+  difference of melody, not of method. Only aggregate statistics of the Essen collection are in the repo; its legal
+  status is "unclear, permission for non-commercial distribution", so the tunes are not.
+- The statistics locate differences and catch regressions. They do not say a difference is a flaw: the reference is
+  European folk song, the generator is word-by-word ambient. The listening test decides, and melodic character is
+  the author's taste.
