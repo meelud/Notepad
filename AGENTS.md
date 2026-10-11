@@ -206,6 +206,11 @@ node tools/essen-stats.mjs <dir>            # (re)build tools/reference/essen-me
 
 - To hear or measure a melodic-motion setting without changing the shipped behaviour: `node tools/melody-report.mjs --set voice=2,leapUp=0.5,inertia=0.9`
   and `node tools/render-offline.mjs --text "..." --melody-set voice=2,leapUp=0.5,inertia=0.9 --wav out.wav` (defaults 0 / 0 / 1 = as shipped).
+- For a listening decision use `node tools/blind-ab.mjs --text '...' --out ~/Desktop/blind-x`: variants are rendered,
+  loudness-matched, given neutral letters in random order, and the answer is in key.txt (open it AFTER ranking).
+  Measured on the sad and joyful test texts: the melody settings change neither voices, nor velocities, nor
+  durations (identical to 3 decimals), only pitches, so a perceived difference in "strike" is a text effect or
+  a contour effect, never a level effect.
 - Both sides use `js/music/melody-metrics.js` (pure, tested in `test/melody-metrics-test.mjs`), so a difference is a
   difference of melody, not of method. Only aggregate statistics of the Essen collection are in the repo; its legal
   status is "unclear, permission for non-commercial distribution", so the tunes are not.
