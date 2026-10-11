@@ -112,6 +112,25 @@ export function wordNoteScale() {
 export const MELODY_FLOOR_HZ = 110;
 export const MELODY_START_MIN_HZ = 220;
 
+// ─── Melodic-motion knobs (all neutral by default) ─────────────────────
+// Measured against 8462 real folk melodies (tools/melody-report.mjs) the generator's melodies
+// are leapier and more zig-zag than real ones: steps 34 % vs 47 %, large leaps going DOWN
+// 54 % vs 39 %, and after a step the next interval continues the same way only 31 % of the
+// time vs 50 %. Three knobs, each a pure change of probabilities (no extra random draw, so
+// the streams stay aligned) and each exactly neutral at its default:
+//   STEP_INERTIA   0..1  after a step, lean the next move to the same direction (Huron: step
+//                        momentum is a learned expectation; strong in folk songs and hymns,
+//                        near zero in pop, Chiu & Temperley 2024 - a STYLE parameter)
+//   LEAP_UP_BIAS   0..1  large leaps go UP more often than down (Vos & Troost 1989: in real
+//                        melodies small intervals fall and large ones rise)
+//   VOICE_WEIGHT   >=1   weight of "stay close to the previous note" against chord-tone pull
+//                        (more steps, fewer thirds and fifths)
+// Whether any of them is wanted is melodic STYLE, i.e. the author's taste; they exist so it can
+// be heard and measured, not assumed.
+export const STEP_INERTIA = 0;
+export const LEAP_UP_BIAS = 0;
+export const VOICE_WEIGHT = 1;
+
 // Experiment hook, like globalThis.__TRACE__ elsewhere: tools/render-offline.mjs sets
 // --melody-floor / --melody-start so settings can be compared by ear and by number.
 // Setting both to 0 reproduces the behaviour from before this rule.
@@ -348,7 +367,10 @@ export function stepwiseNote(prev, tenseScore = 0, directionBias = 0, forceLeap 
   let degree = prev.degree, octave = prev.octave;
   const prevWasLeap = Math.abs(prev.lastInterval || 0) >= 2;
   const bias = Math.max(-1, Math.min(1, directionBias));
-  const upProb = 0.5 + bias * 0.35; // capped skew (15%..85%) — never fully deterministic
+  let upProb = 0.5 + bias * 0.35; // capped skew (15%..85%) — never fully deterministic
+  const inertia = melodyOverride('inertia', STEP_INERTIA), leapUp = melodyOverride('leapUp', LEAP_UP_BIAS);
+  // step momentum: after a one-degree step, lean toward continuing that direction (0 = off)
+  if (inertia > 0 && Math.abs(prev.lastInterval || 0) === 1) upProb += Math.sign(prev.lastInterval) * inertia * 0.5;
 
   let interval;
   if (prevWasLeap) {
@@ -361,7 +383,9 @@ export function stepwiseNote(prev, tenseScore = 0, directionBias = 0, forceLeap 
     const leapChance = 0.15 + Math.max(0, Math.min(1, tenseScore)) * 0.25;
     const isLeap = forceLeap || rnd(0, 1) < leapChance;
     const stepSize = isLeap ? (1 + Math.floor(rnd(0, 2))) + 1 : 1;
-    interval = (rnd(0, 1) < upProb ? 1 : -1) * stepSize;
+    // a leap leans upward by LEAP_UP_BIAS (0 = off); the same draw decides the direction either way
+    const pUp = Math.max(0.05, Math.min(0.95, upProb + (isLeap ? leapUp * 0.4 : 0)));
+    interval = (rnd(0, 1) < pUp ? 1 : -1) * stepSize;
   }
 
   degree += interval;
@@ -622,7 +646,7 @@ function buildCandidatePool(prev, chordRootDegree, tenseScore, contourBias, forc
  */
 function scoreCandidate(candidate, prev, context) {
   const { note, isChordTone } = candidate;
-  const W_VOICE = 1.0;
+  const W_VOICE = 1.0 * melodyOverride('voice', VOICE_WEIGHT);
   const W_HARMONY = context.isStrongBeat ? 1.1 : 0.35;
   const W_SEMANTIC = 0.3 + Math.abs(context.contourBias) * 0.5 + (context.isDisruption ? 0.5 : 0);
   const W_CONTRARY = context.chordDirection !== 0 ? 0.4 : 0;
@@ -715,10 +739,16 @@ function scoreCandidate(candidate, prev, context) {
   // step-dominant motion (45.6% -> 45.2%); coefficients above ~1.8 buy
   // diminishing correlation gains at a real, compounding cost to step-
   // dominance (down to 41% by coeff=5). 1.2 is used for that reason.
+  // Step momentum and upward leaps (see STEP_INERTIA / LEAP_UP_BIAS above). Both 0 at the defaults,
+  // so the score is the one calibrated before; judged by actual pitch direction like the axes above.
+  const inertiaK = melodyOverride('inertia', STEP_INERTIA), leapUpK = melodyOverride('leapUp', LEAP_UP_BIAS);
+  let momentum = 0, leapUp = 0;
+  if (prev && inertiaK > 0 && Math.abs(prev.lastInterval || 0) === 1 && pitchMoveSign !== 0) momentum = pitchMoveSign === Math.sign(prev.lastInterval) ? 1 : -0.5;
+  if (prev && leapUpK > 0 && Math.abs(note.lastInterval || 0) >= 2) leapUp = pitchMoveSign;
   const W_TENSION_LEAP = Math.max(0, context.tenseScore || 0) * 1.2;
   const leapMagnitude = Math.min(1, Math.abs(note.lastInterval || 0) / 3);
 
-  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment + W_NEIGHBOR * neighborReturn + W_TENSION_LEAP * leapMagnitude;
+  return -W_VOICE * voiceLeadingCost + W_HARMONY * harmonicFit + W_SEMANTIC * semanticAlignment + W_CONTRARY * contraryAlignment + W_NEIGHBOR * neighborReturn + W_TENSION_LEAP * leapMagnitude + 0.8 * inertiaK * momentum + 0.6 * leapUpK * leapUp * leapMagnitude;
 }
 
 /**

@@ -10,6 +10,11 @@
 //   node tools/melody-report.mjs --min-words 8 --limit 120
 //   node tools/melody-report.mjs --lang en            # or fa
 //   node tools/melody-report.mjs --by-kind            # also: repeats by (note kind <- previous kind)
+//   node tools/melody-report.mjs --set inertia=0.6,leapUp=0.3,voice=1.3   # try the melodic-motion knobs (0,0,1 = as shipped)
+//   node tools/melody-report.mjs --modes diatonic     # only texts in modes whose every scale step is 1-2 semitones
+//                                                     # (or: exotic, all). The folk reference is diatonic, and in a
+//                                                     # pentatonic or harmonic-minor melody a SCALE STEP is 3 semitones,
+//                                                     # so a semitone comparison of exotic modes would call steps "thirds".
 //
 // Read the result with the caveat in melody-metrics.js: these numbers locate differences and
 // catch regressions; whether a difference is a flaw is a matter of style, and the listening
@@ -28,30 +33,39 @@ if (process.env.NOTEPAD_TRACE !== '1') {              // the decision trace need
 
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
-const minWords = Number(opt('min-words', 12)), limit = Number(opt('limit', 80)), lang = opt('lang', null);
+const setArg = opt('set', '');       // e.g. --set inertia=0.6,leapUp=0.3,voice=1.3  (melodic-motion knobs, see harmony.js)
+if (setArg) globalThis.__NOTEPAD_MELODY__ = Object.fromEntries(setArg.split(',').map(kv => { const [k, v] = kv.split('='); return [k, Number(v)]; }));
+const minWords = Number(opt('min-words', 12)), limit = Number(opt('limit', 80)), lang = opt('lang', null), modesOpt = opt('modes', 'all');
+const DIATONIC = new Set(['locrian', 'phrygian', 'minor', 'dorian', 'melodicMinor', 'mixolydian', 'lydian', 'major']);   // every adjacent step is 1 or 2 semitones
 
 const { runPlay } = await import(pathToFileURL(path.join(root, 'test/harness/run-play.mjs')));
 const { CORPUS_V2 } = await import(pathToFileURL(path.join(root, 'test/corpus-v2.mjs')));
 const { melodyStats, statRows } = await import(pathToFileURL(path.join(root, 'js/music/melody-metrics.js')));
+const H = await import(pathToFileURL(path.join(root, 'js/music/harmony.js')));
 const refFile = path.join(root, 'tools/reference/essen-melody-stats.json');
 if (!fs.existsSync(refFile)) { console.error('missing tools/reference/essen-melody-stats.json — see tools/essen-stats.mjs'); process.exit(2); }
 const ref = JSON.parse(fs.readFileSync(refFile, 'utf8'));
 
 const texts = CORPUS_V2.filter(e => e.text.trim().split(/\s+/).length >= minWords && (!lang || e.lang === lang)).slice(0, limit);
-const melodies = [], kinds = [];
+const melodies = [], kinds = [], modeCount = {};
 let skipped = 0;
 for (const e of texts) {
   let tr; try { tr = await runPlay(root, e.text, {}); } catch { skipped++; continue; }
   const notes = tr.filter(x => x.freq);
   if (notes.length < 6) continue;
+  const mode = H.currentMood, dia = DIATONIC.has(mode);
+  modeCount[mode] = (modeCount[mode] || 0) + 1;
+  if ((modesOpt === 'diatonic' && !dia) || (modesOpt === 'exotic' && dia)) continue;
   melodies.push(notes.map(x => Math.round(12 * Math.log2(x.freq / 440) + 69)));
   kinds.push(notes.map(x => x.k));
 }
 const gen = melodyStats(melodies);
+if (argv.includes('--json')) { console.log(JSON.stringify(gen)); process.exit(0); }
 
 const rr = statRows(ref), gr = statRows(gen);
 const nGen = gen.intervals;
-console.log(`generator: ${gen.melodies} melodies from ${texts.length} texts${lang ? ` (${lang})` : ''}, ${gen.notes} notes, ${nGen} intervals${skipped ? `, ${skipped} failed` : ''}`);
+console.log(`generator: ${gen.melodies} melodies from ${texts.length} texts${lang ? ` (${lang})` : ''}, modes: ${modesOpt}, ${gen.notes} notes, ${nGen} intervals${skipped ? `, ${skipped} failed` : ''}`);
+console.log('modes the texts landed in: ' + Object.entries(modeCount).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', '));
 console.log(`reference: ${ref.melodies} Essen folk melodies, ${ref.notes} notes, ${ref.intervals} intervals\n`);
 console.log('statistic'.padEnd(31) + 'reference'.padStart(10) + 'generator'.padStart(11) + 'diff'.padStart(8) + '   flag (>2 standard errors)');
 rr.forEach(([label, rv, d], i) => {

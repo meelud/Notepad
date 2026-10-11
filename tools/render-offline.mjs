@@ -16,6 +16,7 @@
 //     node tools/render-offline.mjs --text "..." --stem voices          # solo one layer: ambient | voices | punctuation
 //     node tools/render-offline.mjs --text "..." --comp 0.5 --fg-db 3   # melody register compensation / foreground offset
 //     node tools/render-offline.mjs --text "..." --melody-floor 110 --melody-start 440   # melody register rule (0 / 0 = the old behaviour)
+//     node tools/render-offline.mjs --text "..." --melody-set voice=2,leapUp=0.5,inertia=0.9   # melodic-motion knobs (defaults: none)
 //     node tools/render-offline.mjs --text "..." --max-sec 90 --sr 48000
 //
 // How the offline graph is made faithful to the real-time one:
@@ -62,7 +63,9 @@ const STEM = opt('stem', null);
 if (STEM && !['ambient', 'voices', 'punctuation'].includes(STEM)) { console.error('--stem must be ambient, voices or punctuation'); process.exit(2); }
 if (flag('no-master')) globalThis.__NOTEPAD_NO_MASTER__ = true;
 if (['comp', 'fg-db'].some(k => opt(k) !== undefined)) globalThis.__NOTEPAD_MIX__ = { comp: opt('comp') !== undefined ? Number(opt('comp')) : undefined, fgDb: opt('fg-db') !== undefined ? Number(opt('fg-db')) : undefined };
-if (opt('melody-floor') !== undefined || opt('melody-start') !== undefined) globalThis.__NOTEPAD_MELODY__ = { floor: opt('melody-floor') !== undefined ? Number(opt('melody-floor')) : undefined, startMin: opt('melody-start') !== undefined ? Number(opt('melody-start')) : undefined };
+const melodySet = opt('melody-set', '');     // e.g. --melody-set voice=2,leapUp=0.5,inertia=0.9  (melodic-motion knobs, music/harmony.js)
+if (melodySet) globalThis.__NOTEPAD_MELODY__ = { ...(globalThis.__NOTEPAD_MELODY__ || {}), ...Object.fromEntries(melodySet.split(',').map(kv => { const [k, v] = kv.split('='); return [k, Number(v)]; })) };
+if (opt('melody-floor') !== undefined || opt('melody-start') !== undefined) globalThis.__NOTEPAD_MELODY__ = { ...(globalThis.__NOTEPAD_MELODY__ || {}), floor: opt('melody-floor') !== undefined ? Number(opt('melody-floor')) : undefined, startMin: opt('melody-start') !== undefined ? Number(opt('melody-start')) : undefined };
 if (opt('master-db') !== undefined) globalThis.__NOTEPAD_MASTER_DB__ = Number(opt('master-db'));
 
 let NWA;

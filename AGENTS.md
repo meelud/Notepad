@@ -204,6 +204,8 @@ node tools/melody-report.mjs --by-kind     # the generator's melodies vs 8462 Es
 node tools/essen-stats.mjs <dir>            # (re)build tools/reference/essen-melody-stats.json from the Essen .abc files
 ```
 
+- To hear or measure a melodic-motion setting without changing the shipped behaviour: `node tools/melody-report.mjs --set voice=2,leapUp=0.5,inertia=0.9`
+  and `node tools/render-offline.mjs --text "..." --melody-set voice=2,leapUp=0.5,inertia=0.9 --wav out.wav` (defaults 0 / 0 / 1 = as shipped).
 - Both sides use `js/music/melody-metrics.js` (pure, tested in `test/melody-metrics-test.mjs`), so a difference is a
   difference of melody, not of method. Only aggregate statistics of the Essen collection are in the repo; its legal
   status is "unclear, permission for non-commercial distribution", so the tunes are not.
