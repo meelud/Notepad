@@ -11,6 +11,11 @@
 // Variants (melody-motion knobs, music/harmony.js):
 //   now     as shipped (0 / 0 / 1)          gentle  voice=2,leapUp=0.5,inertia=0.9
 //   strong  voice=2,leapUp=1,inertia=1
+//   blendA  voice=2,leapUp=0.75,inertia=0.95     (between gentle and strong)
+//   blendB  voice=2,leapUp=0.6,inertia=1         (strong's lines, gentler leap direction)
+//   blendC  voice=1.6,leapUp=0.75,inertia=1      (strong's lines, more chord-tone pull)
+// A blend is a THIRD melody, not a mixture of two: the knobs change probabilities, so the note path
+// diverges from the first changed choice on. What a blend can do is sit between the two characters.
 //
 // Needs:  npm install --no-save node-web-audio-api
 import { spawnSync } from 'node:child_process';
@@ -25,7 +30,8 @@ const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
 const text = opt('text'), out = opt('out');
 if (!text || !out) { console.error("usage: node tools/blind-ab.mjs --text '...' --out <dir> [--variants now,gentle,strong]"); process.exit(2); }
-const SETS = { now: '', gentle: 'voice=2,leapUp=0.5,inertia=0.9', strong: 'voice=2,leapUp=1,inertia=1' };
+const SETS = { now: '', gentle: 'voice=2,leapUp=0.5,inertia=0.9', strong: 'voice=2,leapUp=1,inertia=1',
+  blendA: 'voice=2,leapUp=0.75,inertia=0.95', blendB: 'voice=2,leapUp=0.6,inertia=1', blendC: 'voice=1.6,leapUp=0.75,inertia=1' };
 const names = opt('variants', 'now,gentle,strong').split(',');
 for (const n of names) if (!(n in SETS)) { console.error(`unknown variant "${n}" (known: ${Object.keys(SETS).join(', ')})`); process.exit(2); }
 
