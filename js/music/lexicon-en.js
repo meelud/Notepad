@@ -135,6 +135,7 @@ export const EMOTION_LEXICON = {
     'jazzed','psyched','jolly','merry','gleeful','giggling',
     'jubilant','overjoyed','cheery','bubbly','perky','spirited',
     'exuberant','radiating','glowing','beaming','grinning','chuckling','celebratory',
+    'celebrate','celebrates','celebrated','celebrating','celebration','celebrations','hooray','yay','congratulations','congrats','victory','triumph','rejoice',
     'festive','silly','goofy','carefree','lighthearted','euphoric',
     'شاد','خوشحال','شادمان','خنده','لبخند','سرخوش','بانمک','هیجان','شور','شعف','مسرور','سرزنده',
     'pumped up','on top of the world','over the moon','in high spirits',
@@ -554,6 +555,9 @@ export const EMOTION_LEXICON = {
     'no way','shut up','get out','are you serious','are you kidding me',
     'you\'re kidding','you\'re joking','you\'re pulling my leg','you\'re messing with me',
     'i can\'t believe it','i don\'t believe it','i refuse to believe it','unreal',
+    // "can't believe ..." is an exclamation of surprise, not a denial of belief: without these entries the
+    // negator flipped the hope word `believe` and everything near it ("I can't believe how happy I am" read dark)
+    'can\'t believe','cannot believe','can not believe',
     'out of nowhere','out of the blue','out of thin air','completely unexpected',
     'never in a million years','who would have thought','who would have guessed',
     'plot twist','game changer','life changer','eye opener','wake up call',

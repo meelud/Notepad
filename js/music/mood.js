@@ -161,6 +161,23 @@ const PHRASE_LOOKUP = (() => {
       if (key in overrides) delete overrides[key];
       const len = key.split(' ').length;
       if (len > MAX_PHRASE_LEN) MAX_PHRASE_LEN = len;
+      // detectMood rewrites "n't" to " not" BEFORE it looks anything up (so that "don't feel
+      // happy" is a negation), which turns "can't stop crying" into "ca not stop crying". An entry
+      // spelled with the contraction can then never match there: measured, 38 of the 41 English
+      // entries with an n't were dead in detectMood and 12 of them read with the OPPOSITE sign,
+      // because the negator flipped the single word next to it ("can't stop crying" -> sad word
+      // flipped -> positive; "I can't believe how happy I am" -> dark). Layers that do not rewrite
+      // still look entries up by the apostrophe-split spelling, so BOTH spellings are registered,
+      // pointing at the same entry. A negator inside a matched phrase never negates it (isNegated
+      // excludes the span), so this does not disturb real negation.
+      if (/n['’]t\b/i.test(w)) {
+        const alias = normalizePhrase(w.replace(/n['’]t\b/gi, ' not'));
+        if (alias && alias !== key && !(alias in map)) {
+          map[alias] = map[key];
+          const alen = alias.split(' ').length;
+          if (alen > MAX_PHRASE_LEN) MAX_PHRASE_LEN = alen;
+        }
+      }
     });
     for (const left of Object.keys(overrides)) unmatched.push(`${cat}/${left}`);
   });
@@ -593,6 +610,12 @@ export function detectMood(text) {
             arousal += hit.arousal * m;
           }
           matchedLen = consumedLen;
+          // A negator that is PART of a matched phrase ("can't stop crying", "can't believe") is
+          // already inside that phrase's meaning; it must not go on to negate the words after it
+          // ("I can't believe how happy I am" is not a denial of being happy).
+          for (let k = negatorPositions.length - 1; k >= 0; k--) {
+            if (negatorPositions[k] >= i && negatorPositions[k] < i + consumedLen) negatorPositions.splice(k, 1);
+          }
           break;
         }
       }
