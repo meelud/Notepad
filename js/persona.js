@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
   topic: 'robbie',
   words: ['robbie'],
-  message: "time time.",
+  message: "You still matter to me, my dear",
   },
 ];
 
