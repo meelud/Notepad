@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
   topic: 'robbie',
   words: ['robbie'],
-  message: "Fucking daylight is here. I want to rip my fucking head off. I didn't get to smoke with you, and now this cigarette tastes like fucking dog shit. anyway, hope you have a good day. kiss love",
+  message: "just for a kiss, what i'd do what i'd do what i'd do",
 
   },
 ];
