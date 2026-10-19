@@ -33,7 +33,7 @@ const TRIGGERS = [
   {
   topic: 'robbie',
   words: ['robbie'],
-  message: "Hope you’re feeling better, and caught a good hour.",
+  message: " امیدوارم از دیروز حالت بهتر باشه، همینطور بدنت. این آرزوی هر روز من برای توئه.",
 
   },
 ];
